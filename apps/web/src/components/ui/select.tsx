@@ -32,7 +32,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
               "w-full h-10 px-3.5 pr-10 text-sm rounded-md appearance-none transition-colors cursor-pointer",
               "bg-[var(--form-bg)] text-[var(--form-text)]",
               "border border-[var(--form-border)] hover:border-[var(--form-hover-border)]",
-              "focus:outline-none focus:border-[var(--form-focus-border)] focus:ring-3 focus:ring-[var(--form-focus-ring)]",
+              "focus:outline-none focus:border-[var(--form-focus-border)]",
               disabled && "bg-[var(--form-disabled-bg)] border-[var(--form-disabled-border)] text-[var(--form-disabled-text)] cursor-not-allowed",
               error && "border-[var(--form-error-border)] bg-[var(--form-error-bg)] text-[var(--form-error-text)]",
               className

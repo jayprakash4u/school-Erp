@@ -90,11 +90,12 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     }
 
     const navWidth = navRef.current.offsetWidth || 1200;
-    const modalWidth = 480;
+    const hasTwoCols = Boolean(activeModule?.categories && activeModule.categories.length > 1);
+    const modalWidth = hasTwoCols ? 480 : 230;
     const itemCenter = activeItemMeta.rectLeft + activeItemMeta.rectWidth / 2;
 
     // Center modal under clicked tab item, clamped within nav bounds
-    let modalLeft = itemCenter - modalWidth / 3;
+    let modalLeft = hasTwoCols ? itemCenter - modalWidth / 3 : itemCenter - modalWidth / 2;
     if (modalLeft < 16) {
       modalLeft = 16;
     } else if (modalLeft + modalWidth > navWidth - 16) {

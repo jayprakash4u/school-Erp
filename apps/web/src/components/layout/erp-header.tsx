@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { GraduationCap, Search, ChevronDown, Zap } from "lucide-react";
+import { GraduationCap, Search, ChevronDown, LayoutGrid } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { QuickAccessModal } from "./quick-access-modal";
 import { ROUTES } from "@/constants/routes";
@@ -56,7 +56,7 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
                 value={searchQuery}
                 onChange={handleSearch}
                 placeholder="Search anything... (e.g. student, fee, report, class)"
-                className="w-full h-10 pl-10 pr-12 text-xs text-white bg-[var(--neutral-900)] border border-[var(--neutral-700)] rounded-lg placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--red-900)]/40 transition-all shadow-inner"
+                className="w-full h-10 pl-10 pr-12 text-xs text-white bg-[var(--neutral-900)] border border-[var(--neutral-700)] rounded-lg placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors shadow-inner"
               />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <kbd className="hidden lg:inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-mono text-[var(--neutral-400)] bg-[var(--neutral-800)] border border-[var(--neutral-700)] rounded">
@@ -68,7 +68,7 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
 
           {/* Right: Quick Menu, Fiscal Year & User Profile */}
           <div className="flex items-center gap-3 shrink-0">
-            {/* Quick Menu Button with 3-Column Popover Modal */}
+            {/* Quick Menu Button with 4-Column Popover Modal */}
             <div className="relative">
               <button
                 type="button"
@@ -80,7 +80,7 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
                     : "bg-[var(--neutral-900)] text-white border-[var(--neutral-700)] hover:bg-[var(--neutral-800)] hover:border-[var(--neutral-600)]"
                 )}
               >
-                <Zap className="h-3.5 w-3.5 text-[var(--brand-accent)] fill-[var(--brand-accent)]" />
+                <LayoutGrid className="h-3.5 w-3.5 text-[var(--neutral-300)]" />
                 <span>Quick Menu</span>
                 <ChevronDown
                   className={cn(
@@ -98,8 +98,7 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
             </div>
 
             {/* Fiscal Year (FY) Indicator */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[6px] bg-[var(--neutral-900)] border border-[var(--neutral-700)] text-xs text-[var(--neutral-300)] font-medium">
-              <span className="h-2 w-2 rounded-full bg-[var(--brand-accent)] animate-pulse" />
+            <div className="flex items-center px-2.5 py-1.5 rounded-[6px] bg-[var(--neutral-900)] border border-[var(--neutral-700)] text-xs text-[var(--neutral-300)] font-medium">
               <span className="font-semibold text-white">FY- {activeAcademicYear}</span>
             </div>
 

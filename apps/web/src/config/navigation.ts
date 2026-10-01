@@ -77,6 +77,8 @@ import {
   LifeBuoy,
   FileQuestion,
   Activity,
+  ArrowRight,
+  ArrowLeftRight,
 } from "lucide-react";
 import { NavItem } from "@/types/navigation";
 import { ROUTES } from "@/constants/routes";
@@ -105,37 +107,17 @@ export const erpModules: NavItem[] = [
     icon: GraduationCap,
     categories: [
       {
-        title: "Student Admissions & Directory",
+        title: "Students",
         items: [
-          { title: "Add New Student", href: ROUTES.STUDENTS.ADMISSION, icon: UserPlus },
-          { title: "Student List", href: ROUTES.STUDENTS.ROOT, icon: List },
-          { title: "Student Profile", href: "/students/profile", icon: User },
-          { title: "Bulk Import", href: "/students/import", icon: Upload },
-          { title: "Bulk Update", href: "/students/bulk-update", icon: RefreshCw },
-          { title: "Student Groups", href: "/students/groups", icon: Users },
-          { title: "Student Categories", href: "/students/categories", icon: Tag },
-          { title: "Student House", href: "/students/houses", icon: Home },
-          { title: "Roll Number Generation", href: "/students/roll-generation", icon: FileBadge },
-          { title: "Transfer Certificate", href: "/students/tc", icon: FileCheck },
-        ],
-      },
-      {
-        title: "Certificates & Search Lookup",
-        items: [
-          { title: "Leaving Certificate", href: "/students/leaving-certificate", icon: FileX },
-          { title: "Duplicate Certificate", href: "/students/duplicate-certificate", icon: Copy },
-          { title: "Student Search", href: "/students/search", icon: Search },
-          { title: "Advanced Search", href: "/students/advanced-search", icon: Search },
-          { title: "Student History", href: "/students/history", icon: History },
-          { title: "Student Documents", href: "/students/documents", icon: FileCode },
-          { title: "Student Attendance", href: ROUTES.STUDENTS.ATTENDANCE, icon: CheckSquare },
-          { title: "Class-wise Student List", href: "/students/class-wise", icon: Grid },
-          { title: "Section-wise Student List", href: "/students/section-wise", icon: Layers },
-          { title: "Subject-wise Student List", href: "/students/subject-wise", icon: BookOpen },
+          { title: "Our Students", href: ROUTES.STUDENTS.ROOT, icon: Users },
+          { title: "Student Registration", href: ROUTES.STUDENTS.ADMISSION, icon: UserPlus },
+          { title: "Upgrade Class", href: "/students/upgrade-class", icon: ArrowRight },
+          { title: "Change Section", href: "/students/change-section", icon: ArrowLeftRight },
         ],
       },
     ],
   },
+
 
   // 3. Academics
   {
@@ -618,29 +600,21 @@ export const erpModules: NavItem[] = [
     icon: Sliders,
     categories: [
       {
-        title: "Academic & Global Masters",
+        title: "Setup",
         items: [
-          { title: "Academic Sessions", href: "/master-setup/sessions", icon: Calendar },
-          { title: "Campus & Branch Registry", href: "/master-setup/branches", icon: Building2 },
-          { title: "Grading Scales & Levels", href: "/master-setup/grading-scales", icon: Award },
-          { title: "Subject Master Groups", href: "/master-setup/subject-groups", icon: BookOpen },
-          { title: "Student Category Master", href: "/master-setup/student-categories", icon: Users },
-          { title: "Fee Head & Category Master", href: "/master-setup/fee-heads", icon: Coins },
-        ],
-      },
-      {
-        title: "System & Gateway Masters",
-        items: [
-          { title: "Global Dropdowns & Lookups", href: "/master-setup/lookups", icon: Grid },
-          { title: "Custom Fields Builder", href: "/master-setup/custom-fields", icon: Sliders },
-          { title: "Payment Gateway Master", href: "/master-setup/payment-gateways", icon: CreditCard },
-          { title: "SMS & WhatsApp Gateways", href: "/master-setup/communication-gateways", icon: Smartphone },
-          { title: "API Keys & Webhooks", href: "/master-setup/api-keys", icon: Key },
-          { title: "Document & ID Templates", href: "/master-setup/templates", icon: FileCode },
+          { title: "General Setup", href: "/master-setup/general", icon: Settings },
+          { title: "Class Setup", href: "/master-setup/classes", icon: GraduationCap },
+          { title: "Location", href: "/master-setup/locations", icon: MapPin },
+          { title: "Batch", href: "/master-setup/batches", icon: Calendar },
+          { title: "Subject", href: "/master-setup/subjects", icon: FileText },
+          { title: "Subject Mapping", href: "/master-setup/subject-mapping", icon: Layers },
+          { title: "Document Numbering", href: "/master-setup/document-numbering", icon: Tag },
         ],
       },
     ],
   },
+
+
 
   // 20. Help & Support
   {

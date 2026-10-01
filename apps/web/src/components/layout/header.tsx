@@ -28,7 +28,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           <input
             type="text"
             placeholder="Search students, classes, invoices..."
-            className="w-full h-9 pl-9 pr-3 text-xs rounded-md bg-[var(--bg-secondary)] border border-[var(--border-strong)] text-[var(--text-primary)] placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--red-100)] transition-all"
+            className="w-full h-9 pl-9 pr-3 text-xs rounded-md bg-[var(--bg-secondary)] border border-[var(--border-strong)] text-[var(--text-primary)] placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] transition-colors"
           />
         </div>
       </div>

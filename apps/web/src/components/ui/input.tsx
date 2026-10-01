@@ -38,9 +38,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               "w-full h-10 px-3.5 text-sm rounded-md transition-colors",
               "bg-[var(--form-bg)] text-[var(--form-text)] placeholder:text-[var(--form-placeholder)]",
               "border border-[var(--form-border)] hover:border-[var(--form-hover-border)]",
-              "focus:outline-none focus:border-[var(--form-focus-border)] focus:ring-3 focus:ring-[var(--form-focus-ring)]",
+              "focus:outline-none focus:border-[var(--form-focus-border)]",
               disabled && "bg-[var(--form-disabled-bg)] border-[var(--form-disabled-border)] text-[var(--form-disabled-text)] cursor-not-allowed",
-              error && "border-[var(--form-error-border)] bg-[var(--form-error-bg)] text-[var(--form-error-text)] focus:ring-[var(--red-200)]",
+              error && "border-[var(--form-error-border)] bg-[var(--form-error-bg)] text-[var(--form-error-text)]",
               leftIcon && "pl-10",
               rightIcon && "pr-10",
               className

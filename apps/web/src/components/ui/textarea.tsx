@@ -72,7 +72,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             "w-full px-3.5 py-2.5 text-sm rounded-md transition-colors resize-y min-h-[80px]",
             "bg-[var(--form-bg)] text-[var(--form-text)] placeholder:text-[var(--form-placeholder)]",
             "border border-[var(--form-border)] hover:border-[var(--form-hover-border)]",
-            "focus:outline-none focus:border-[var(--form-focus-border)] focus:ring-3 focus:ring-[var(--form-focus-ring)]",
+            "focus:outline-none focus:border-[var(--form-focus-border)]",
             disabled &&
               "bg-[var(--form-disabled-bg)] border-[var(--form-disabled-border)] text-[var(--form-disabled-text)] cursor-not-allowed",
             error &&
