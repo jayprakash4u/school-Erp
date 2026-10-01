@@ -1,5 +1,5 @@
 /**
- * Authentication and User Role Types
+ * Authentication and User Role Types for School ERP
  */
 
 export type UserRole =
@@ -12,6 +12,13 @@ export type UserRole =
   | "ACCOUNTANT"
   | "LIBRARIAN";
 
+export interface SchoolBranchInfo {
+  id: string;
+  name: string;
+  code: string;
+  isPrimary?: boolean;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -20,11 +27,28 @@ export interface UserProfile {
   role: UserRole;
   schoolId?: string;
   schoolName?: string;
+  availableSchools?: SchoolBranchInfo[];
   permissions: string[];
+  phoneNumber?: string;
 }
 
 export interface AuthSession {
   user: UserProfile | null;
   token: string | null;
+  refreshToken?: string | null;
+  expiresAt?: number | null;
   isAuthenticated: boolean;
+}
+
+export interface LoginRequest {
+  email: string;
+  password?: string;
+  rememberMe?: boolean;
+}
+
+export interface LoginResponse {
+  token: string;
+  refreshToken: string;
+  expiresAt: number;
+  user: UserProfile;
 }
