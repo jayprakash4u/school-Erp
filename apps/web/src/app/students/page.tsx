@@ -24,9 +24,13 @@ import {
   Filter,
   Columns,
   RefreshCw,
+  UserX,
+  UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { ErpHeader } from "@/components/layout/erp-header";
 import { ErpTopNav } from "@/components/layout/erp-top-nav";
+import { StudentServiceDisableDropdown } from "@/components/students/student-service-disable-dropdown";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +98,8 @@ export interface StudentRecord {
   caste?: string;
   maritalStatus?: string;
   status: "Active" | "Inactive" | "Transferred";
+  disabledServices?: string[];
+  disabledReason?: string;
 }
 
 // Initial realistic Nepali School ERP demo data
@@ -403,7 +409,8 @@ const ALL_COLUMNS: ColumnConfig[] = [
   { key: "ethnicGroup", label: "Ethnic Group", minWidth: 120, visibleByDefault: true },
   { key: "caste", label: "Caste", minWidth: 95, visibleByDefault: true },
   { key: "maritalStatus", label: "Marital Status", minWidth: 105, visibleByDefault: true },
-  { key: "actions", label: "Actions", minWidth: 90, pinned: "right", visibleByDefault: true },
+  { key: "status", label: "Status", minWidth: 95, visibleByDefault: true },
+  { key: "actions", label: "Actions", minWidth: 140, pinned: "right", visibleByDefault: true },
 ];
 
 export default function OurStudentsPage() {
@@ -415,6 +422,44 @@ export default function OurStudentsPage() {
   const [currentPage, setCurrentPage] = React.useState<number>(1);
   const [isColumnDropdownOpen, setIsColumnDropdownOpen] = React.useState<boolean>(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = React.useState<boolean>(false);
+  const [studentToDelete, setStudentToDelete] = React.useState<StudentRecord | null>(null);
+  const [activeDisableDropdownStudentId, setActiveDisableDropdownStudentId] = React.useState<string | null>(null);
+
+  const handleDisableServices = (studentId: string, serviceIdsToDisable: string[]) => {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id !== studentId) return s;
+        const current = s.disabledServices || [];
+        const next = Array.from(new Set([...current, ...serviceIdsToDisable]));
+        return {
+          ...s,
+          status: "Inactive",
+          disabledServices: next,
+        };
+      })
+    );
+  };
+
+  const handleEnableService = (studentId: string, serviceId: string) => {
+    setStudents((prev) =>
+      prev.map((s) => {
+        if (s.id !== studentId) return s;
+        const current = s.disabledServices || [];
+        const next = current.filter((id) => id !== serviceId);
+        return {
+          ...s,
+          status: next.length > 0 ? "Inactive" : "Active",
+          disabledServices: next,
+        };
+      })
+    );
+  };
+
+  const handleDeleteStudent = (studentId: string) => {
+    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+    setSelectedStudentIds((prev) => prev.filter((id) => id !== studentId));
+    setStudentToDelete(null);
+  };
 
   // Column Visibility state
   const [visibleColumns, setVisibleColumns] = React.useState<Record<string, boolean>>(() => {
@@ -754,7 +799,8 @@ export default function OurStudentsPage() {
                         key={student.id}
                         className={cn(
                           "hover:bg-[var(--neutral-50)]/80 transition-colors",
-                          isSelected && "bg-[var(--red-50)]/40"
+                          isSelected && "bg-[var(--red-50)]/40",
+                          activeDisableDropdownStudentId === student.id ? "relative z-40" : ""
                         )}
                       >
                         {/* Select Row Checkbox */}
@@ -1211,24 +1257,129 @@ export default function OurStudentsPage() {
                           </td>
                         )}
 
-                        {/* Actions */}
+                        {/* Status */}
+                        {visibleColumns["status"] && (
+                          <td className="py-2.5 px-3 border-r border-[var(--border-light)]">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span
+                                className={cn(
+                                  "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1",
+                                  student.status === "Active"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : student.status === "Inactive"
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-neutral-100 text-neutral-600 border border-neutral-300"
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    student.status === "Active"
+                                      ? "bg-emerald-500"
+                                      : student.status === "Inactive"
+                                      ? "bg-amber-500"
+                                      : "bg-neutral-400"
+                                  )}
+                                />
+                                {student.status}
+                              </span>
+
+                              {student.disabledServices && student.disabledServices.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveDisableDropdownStudentId((prev) =>
+                                      prev === student.id ? null : student.id
+                                    )
+                                  }
+                                  className="text-[9px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.2 rounded border border-amber-200 cursor-pointer transition-colors"
+                                  title={`Restricted services: ${student.disabledServices.join(", ")} - Click to manage`}
+                                >
+                                  {student.disabledServices.length} Service(s) Restricted
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        )}
+
+                        {/* Actions: View, Edit, Disable, Delete */}
                         {visibleColumns["actions"] && (
-                          <td className="py-2.5 px-3 text-right sticky right-0 bg-[var(--bg-primary)] shadow-l">
+                          <td
+                            className={cn(
+                              "py-2.5 px-3 text-right sticky right-0 bg-[var(--bg-primary)] shadow-l",
+                              activeDisableDropdownStudentId === student.id ? "z-40" : "z-10"
+                            )}
+                          >
                             <div className="inline-flex items-center gap-1">
+                              {/* View Profile */}
                               <Link
                                 href={`/students/${student.id}`}
                                 title="View Profile"
-                                className="p-1 rounded text-[var(--neutral-500)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-100)]"
+                                className="p-1 rounded text-[var(--neutral-500)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-100)] transition-colors cursor-pointer"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                               </Link>
+
+                              {/* Edit Profile */}
                               <Link
                                 href={`/students/${student.id}/edit`}
-                                title="Edit"
-                                className="p-1 rounded text-[var(--neutral-500)] hover:text-black hover:bg-[var(--neutral-100)]"
+                                title="Edit Student"
+                                className="p-1 rounded text-[var(--neutral-500)] hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Link>
+
+                              {/* Disable Services Interactive Dropdown Trigger */}
+                              <div className="relative inline-block text-left">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setActiveDisableDropdownStudentId((prev) =>
+                                      prev === student.id ? null : student.id
+                                    )
+                                  }
+                                  title={
+                                    student.disabledServices && student.disabledServices.length > 0
+                                      ? "Manage / Disable More Services"
+                                      : "Disable Student Services (Billing, Exam, Bus, etc.)"
+                                  }
+                                  className={cn(
+                                    "p-1 rounded transition-colors cursor-pointer",
+                                    activeDisableDropdownStudentId === student.id
+                                      ? "bg-amber-100 text-amber-900 ring-1 ring-amber-400"
+                                      : student.status === "Active"
+                                      ? "text-[var(--neutral-500)] hover:text-amber-600 hover:bg-amber-50"
+                                      : "text-amber-600 hover:text-emerald-600 hover:bg-emerald-50"
+                                  )}
+                                >
+                                  {student.status === "Active" ? (
+                                    <UserX className="h-3.5 w-3.5" />
+                                  ) : (
+                                    <UserCheck className="h-3.5 w-3.5" />
+                                  )}
+                                </button>
+
+                                {/* Inline Dropdown Popover */}
+                                <StudentServiceDisableDropdown
+                                  isOpen={activeDisableDropdownStudentId === student.id}
+                                  onClose={() => setActiveDisableDropdownStudentId(null)}
+                                  studentId={student.id}
+                                  studentName={student.fullName}
+                                  disabledServices={student.disabledServices || []}
+                                  onDisableServices={handleDisableServices}
+                                  onEnableService={handleEnableService}
+                                />
+                              </div>
+
+                              {/* Delete Student */}
+                              <button
+                                type="button"
+                                onClick={() => setStudentToDelete(student)}
+                                title="Delete Student"
+                                className="p-1 rounded text-[var(--neutral-500)] hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
                           </td>
                         )}
@@ -1325,6 +1476,45 @@ export default function OurStudentsPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {studentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in-0 duration-150">
+          <div className="bg-white rounded-lg border border-[var(--border-default)] shadow-2xl max-w-md w-full p-5 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-neutral-900">Delete Student Record</h3>
+                <p className="text-xs text-neutral-600 leading-relaxed">
+                  Are you sure you want to delete student{" "}
+                  <strong className="text-neutral-900">{studentToDelete.fullName}</strong> (Roll:{" "}
+                  {studentToDelete.rollNumber}, Adm: {studentToDelete.admissionNumber})? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--border-light)]">
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                className="px-3.5 py-1.5 rounded-[4px] border border-[var(--border-default)] text-xs font-medium text-neutral-700 hover:bg-neutral-50 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteStudent(studentToDelete.id)}
+                className="px-3.5 py-1.5 rounded-[4px] bg-red-600 hover:bg-red-700 text-xs font-semibold text-white shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Confirm Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

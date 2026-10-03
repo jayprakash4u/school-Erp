@@ -17,6 +17,8 @@ interface ErpTopNavProps {
 export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps) {
   const pathname = usePathname();
   const [openModuleId, setOpenModuleId] = React.useState<string | null>(null);
+  const [isScrolled, setIsScrolled] = React.useState<boolean>(false);
+  const [hoveredModuleId, setHoveredModuleId] = React.useState<string | null>(null);
   const [activeItemMeta, setActiveItemMeta] = React.useState<{
     row: 1 | 2;
     index: number;
@@ -25,6 +27,44 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
   } | null>(null);
 
   const navRef = React.useRef<HTMLDivElement>(null);
+
+  const isScrolledRef = React.useRef<boolean>(false);
+
+  // Scroll detection with hysteresis to collapse 2 rows into 1 sleek icon + micro-label bar
+  // Uses dual thresholds (>85px to collapse, <15px to expand) to prevent layout thrashing & jitter
+  React.useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY || document.documentElement.scrollTop;
+          const currentlyScrolled = isScrolledRef.current;
+
+          if (!currentlyScrolled && scrollY > 85) {
+            isScrolledRef.current = true;
+            setIsScrolled(true);
+          } else if (currentlyScrolled && scrollY < 15) {
+            isScrolledRef.current = false;
+            setIsScrolled(false);
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Initial check
+    const initialScrollY = window.scrollY || document.documentElement.scrollTop;
+    if (initialScrollY > 85) {
+      isScrolledRef.current = true;
+      setIsScrolled(true);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   // Close menus on outside click or Escape key
   React.useEffect(() => {
@@ -52,7 +92,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
 
   const activeModule = erpModules.find((m) => m.id === openModuleId);
 
-  // Split the 20 modules into 2 continuous sleek rows of 10 items each
+  // Split the 20 modules into 2 continuous sleek rows of 10 items each for normal mode
   const firstRowModules = erpModules.slice(0, 10);
   const secondRowModules = erpModules.slice(10, 20);
 
@@ -64,11 +104,9 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     }
 
     if (openModuleId === module.id) {
-      // Toggle close if clicking the same open module
       setOpenModuleId(null);
       setActiveItemMeta(null);
     } else {
-      // Open the clicked module and calculate its horizontal position
       const navRect = navRef.current?.getBoundingClientRect();
       const itemRect = el.getBoundingClientRect();
       const relativeLeft = navRect ? itemRect.left - navRect.left : itemRect.left;
@@ -86,7 +124,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
   // Calculate horizontal position and caret alignment of dropdown modal
   const getDropdownStyle = () => {
     if (!activeItemMeta || !navRef.current) {
-      return { left: 16, caretPercent: 20, top: 40 };
+      return { left: 16, caretPercent: 20, top: isScrolled ? 52 : 40 };
     }
 
     const navWidth = navRef.current.offsetWidth || 1200;
@@ -94,7 +132,6 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     const modalWidth = hasTwoCols ? 480 : 230;
     const itemCenter = activeItemMeta.rectLeft + activeItemMeta.rectWidth / 2;
 
-    // Center modal under clicked tab item, clamped within nav bounds
     let modalLeft = hasTwoCols ? itemCenter - modalWidth / 3 : itemCenter - modalWidth / 2;
     if (modalLeft < 16) {
       modalLeft = 16;
@@ -102,12 +139,12 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
       modalLeft = Math.max(16, navWidth - modalWidth - 16);
     }
 
-    // Caret percentage relative to modal width
     const caretPixel = itemCenter - modalLeft;
-    const caretPercent = (caretPixel / modalWidth) * 100;
+    const caretPercent = Math.max(10, Math.min(90, (caretPixel / modalWidth) * 100));
 
-    // Row 1 sits at top 40px, Row 2 sits at top 80px
-    const top = activeItemMeta.row === 1 ? 40 : 80;
+    // When scrolled (1 row mode), dropdown opens right below the single row (52px)
+    // When expanded (2 rows), Row 1 sits at top 40px, Row 2 sits at top 80px
+    const top = isScrolled ? 52 : activeItemMeta.row === 1 ? 40 : 80;
 
     return {
       left: modalLeft,
@@ -118,7 +155,13 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
 
   const dropdownPos = getDropdownStyle();
 
-  const renderNavItem = (module: NavItem, row: 1 | 2, index: number, isLastInRow: boolean) => {
+  // Helper for expanded mode items (Default top of page)
+  const renderExpandedNavItem = (
+    module: NavItem,
+    row: 1 | 2,
+    index: number,
+    isLastInRow: boolean
+  ) => {
     const Icon = module.icon;
     const hasSub = module.categories && module.categories.length > 0;
     const isOpen = openModuleId === module.id;
@@ -138,7 +181,14 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
         {hasSub ? (
           <button
             type="button"
-            onClick={(e) => handleModuleClick(module, row, index, e.currentTarget.parentElement || e.currentTarget)}
+            onClick={(e) =>
+              handleModuleClick(
+                module,
+                row,
+                index,
+                e.currentTarget.parentElement || e.currentTarget
+              )
+            }
             className={cn(
               "w-full h-full px-2 sm:px-3 flex items-center justify-center gap-1.5 text-xs font-medium transition-all duration-150 select-none cursor-pointer group relative",
               isOpen || isCurrentActive
@@ -146,9 +196,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--neutral-50)]"
             )}
           >
-            <Icon
-              className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors"
-            />
+            <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors" />
             <span className="truncate tracking-tight">{module.title}</span>
             <ChevronDown
               className={cn(
@@ -156,8 +204,6 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
                 isOpen && "rotate-180 text-[var(--brand-primary)]"
               )}
             />
-
-            {/* Subtle Active Bottom Indicator Line */}
             {(isOpen || isCurrentActive) && (
               <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--brand-primary)]" />
             )}
@@ -176,12 +222,8 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--neutral-50)]"
             )}
           >
-            <Icon
-              className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors"
-            />
+            <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors" />
             <span className="truncate tracking-tight">{module.title}</span>
-
-            {/* Subtle Active Bottom Indicator Line */}
             {isCurrentActive && (
               <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--brand-primary)]" />
             )}
@@ -191,28 +233,180 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     );
   };
 
+  // Helper for collapsed single-row mode (Shows both Icon + Micro-Text label)
+  const renderCollapsedIconItem = (module: NavItem, index: number, isLast: boolean) => {
+    const Icon = module.icon;
+    const hasSub = module.categories && module.categories.length > 0;
+    const isOpen = openModuleId === module.id;
+    const isHovered = hoveredModuleId === module.id;
+    const isCurrentActive =
+      activeModuleId === module.id ||
+      pathname === module.href ||
+      (pathname !== "/" && module.href !== "/" && pathname.startsWith(module.href));
+
+    return (
+      <div
+        key={module.id}
+        onMouseEnter={() => setHoveredModuleId(module.id)}
+        onMouseLeave={() => setHoveredModuleId(null)}
+        className={cn(
+          "flex-1 min-w-[56px] max-w-[90px] h-[52px] flex items-center justify-center relative group transition-colors",
+          !isLast && "border-r border-[var(--border-default)]/60"
+        )}
+      >
+        {hasSub ? (
+          <button
+            type="button"
+            onClick={(e) =>
+              handleModuleClick(
+                module,
+                1,
+                index,
+                e.currentTarget.parentElement || e.currentTarget
+              )
+            }
+            className={cn(
+              "w-full h-full px-0.5 py-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150 select-none cursor-pointer relative",
+              isOpen || isCurrentActive
+                ? "bg-[var(--red-50)]/80 text-[var(--brand-primary)] font-bold"
+                : "text-[var(--neutral-600)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)]"
+            )}
+            title={module.title}
+            aria-label={module.title}
+          >
+            <div className="transition-transform duration-150 group-hover:scale-110 shrink-0">
+              <Icon
+                className={cn(
+                  "h-3.5 w-3.5 transition-colors",
+                  isOpen || isCurrentActive
+                    ? "text-[var(--brand-primary)]"
+                    : "text-[var(--brand-primary)]/80 group-hover:text-[var(--brand-primary)]"
+                )}
+              />
+            </div>
+
+            {/* Micro-Text Label adjusted to fit single row */}
+            <span
+              className={cn(
+                "w-full text-center text-[9px] font-semibold tracking-tighter truncate px-0.5 leading-none transition-colors",
+                isOpen || isCurrentActive
+                  ? "text-[var(--brand-primary)] font-bold"
+                  : "text-[var(--neutral-700)] group-hover:text-[var(--brand-primary)]"
+              )}
+            >
+              {module.title}
+            </span>
+
+            {/* Active Bottom Indicator */}
+            {(isOpen || isCurrentActive) && (
+              <span className="absolute bottom-0 left-1 right-1 h-[2px] rounded-t-full bg-[var(--brand-primary)]" />
+            )}
+          </button>
+        ) : (
+          <Link
+            href={module.href}
+            onClick={() => {
+              setOpenModuleId(null);
+              setActiveItemMeta(null);
+            }}
+            className={cn(
+              "w-full h-full px-0.5 py-1 flex flex-col items-center justify-center gap-0.5 transition-all duration-150 select-none group relative",
+              isCurrentActive
+                ? "bg-[var(--red-50)]/80 text-[var(--brand-primary)] font-bold"
+                : "text-[var(--neutral-600)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)]"
+            )}
+            title={module.title}
+            aria-label={module.title}
+          >
+            <div className="transition-transform duration-150 group-hover:scale-110 shrink-0">
+              <Icon
+                className={cn(
+                  "h-3.5 w-3.5 transition-colors",
+                  isCurrentActive
+                    ? "text-[var(--brand-primary)]"
+                    : "text-[var(--brand-primary)]/80 group-hover:text-[var(--brand-primary)]"
+                )}
+              />
+            </div>
+
+            {/* Micro-Text Label adjusted to fit single row */}
+            <span
+              className={cn(
+                "w-full text-center text-[9px] font-semibold tracking-tighter truncate px-0.5 leading-none transition-colors",
+                isCurrentActive
+                  ? "text-[var(--brand-primary)] font-bold"
+                  : "text-[var(--neutral-700)] group-hover:text-[var(--brand-primary)]"
+              )}
+            >
+              {module.title}
+            </span>
+
+            {/* Active Bottom Indicator */}
+            {isCurrentActive && (
+              <span className="absolute bottom-0 left-1 right-1 h-[2px] rounded-t-full bg-[var(--brand-primary)]" />
+            )}
+          </Link>
+        )}
+
+        {/* Hover Tooltip popup for full title & submenu count */}
+        {isHovered && !isOpen && (
+          <div className="absolute top-full mt-1.5 z-50 pointer-events-none animate-in fade-in-0 zoom-in-95 duration-150">
+            <div className="relative bg-neutral-900 text-white text-[11px] font-bold px-2.5 py-1 rounded-[4px] shadow-xl whitespace-nowrap flex items-center gap-1.5">
+              <span>{module.title}</span>
+              {hasSub && (
+                <span className="text-[9px] text-[var(--brand-accent)] font-normal">
+                  ({module.categories?.length || 0} submenus)
+                </span>
+              )}
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-neutral-900 rotate-45" />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <nav
       ref={navRef}
-      className="relative bg-[var(--bg-primary)] border-b border-[var(--border-default)] shadow-2xs z-30 overflow-visible"
+      className={cn(
+        "sticky top-16 z-30 bg-white border-b border-[var(--border-default)] shadow-xs overflow-visible transition-colors duration-200",
+        isScrolled ? "bg-white/95 backdrop-blur-md shadow-sm" : ""
+      )}
       aria-label="Main ERP Modules Navigation"
     >
       <div className="max-w-[1600px] mx-auto relative overflow-visible">
-        {/* Row 1: Primary Academic & Student Operations */}
-        <div className="flex items-stretch border-b border-[var(--border-default)] overflow-visible">
-          {firstRowModules.map((module, idx) =>
-            renderNavItem(module, 1, idx, idx === firstRowModules.length - 1)
-          )}
-        </div>
+        {isScrolled ? (
+          /* =================================================================== */
+          /* COLLAPSED SCROLLED STATE: SINGLE COMPACT ROW WITH ICONS + MICRO TEXT */
+          /* =================================================================== */
+          <div className="flex items-stretch justify-between overflow-x-auto custom-scrollbar no-scrollbar animate-in fade-in-0 duration-200">
+            {erpModules.map((module, idx) =>
+              renderCollapsedIconItem(module, idx, idx === erpModules.length - 1)
+            )}
+          </div>
+        ) : (
+          /* =================================================================== */
+          /* DEFAULT TOP STATE: FULL 2-ROW NAVIGATION WITH FULL LABELS           */
+          /* =================================================================== */
+          <div className="animate-in fade-in-0 duration-200">
+            {/* Row 1: Primary Academic & Student Operations */}
+            <div className="flex items-stretch border-b border-[var(--border-default)] overflow-visible">
+              {firstRowModules.map((module, idx) =>
+                renderExpandedNavItem(module, 1, idx, idx === firstRowModules.length - 1)
+              )}
+            </div>
 
-        {/* Row 2: Management, Infrastructure & System */}
-        <div className="flex items-stretch overflow-visible">
-          {secondRowModules.map((module, idx) =>
-            renderNavItem(module, 2, idx, idx === secondRowModules.length - 1)
-          )}
-        </div>
+            {/* Row 2: Management, Infrastructure & System */}
+            <div className="flex items-stretch overflow-visible">
+              {secondRowModules.map((module, idx) =>
+                renderExpandedNavItem(module, 2, idx, idx === secondRowModules.length - 1)
+              )}
+            </div>
+          </div>
+        )}
 
-        {/* Global Anchored Submenu Popover Modal on Click */}
+        {/* Global Anchored Submenu Popover Modal on Click (Works in Both Modes!) */}
         {activeModule && openModuleId && (
           <div
             style={{

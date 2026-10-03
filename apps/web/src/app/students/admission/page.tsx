@@ -12,19 +12,31 @@ import {
   FileText,
   Upload,
   CheckCircle2,
-  Calendar,
-  AlertCircle,
-  Save,
   ChevronRight,
   ChevronLeft,
   X,
   UploadCloud,
   Check,
+  SlidersHorizontal,
+  AlertTriangle,
+  AlertCircle,
+  ArrowUpRight,
 } from "lucide-react";
 import { ErpHeader } from "@/components/layout/erp-header";
 import { ErpTopNav } from "@/components/layout/erp-top-nav";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+import {
+  StudentFormSchema,
+  FormFieldDef,
+  SectionKey,
+} from "@/types/form-schema";
+import {
+  INITIAL_STUDENT_FORM_SCHEMA,
+  SCHEMA_STORAGE_KEY,
+} from "@/config/student-form-schema";
+import { FieldCustomizerModal } from "@/components/students/field-customizer-modal";
+import { DynamicFieldRenderer } from "@/components/students/dynamic-field-renderer";
 
 // Step Definitions
 const STEPS = [
@@ -33,18 +45,51 @@ const STEPS = [
   { id: 3, label: "Address & Guardian", icon: MapPin },
   { id: 4, label: "Additional Info", icon: FileText },
   { id: 5, label: "Documents", icon: Upload },
+  { id: 6, label: "Custom Fields", icon: SlidersHorizontal },
 ];
+
+interface StepValidationIssue {
+  stepId: number;
+  stepLabel: string;
+  missingFields: string[];
+}
 
 export default function StudentRegistrationPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = React.useState<number>(1);
   const [isCustomizeOpen, setIsCustomizeOpen] = React.useState<boolean>(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = React.useState<boolean>(false);
+  const [isValidationModalOpen, setIsValidationModalOpen] = React.useState<boolean>(false);
   const [isDraftSaved, setIsDraftSaved] = React.useState<boolean>(false);
+  const [toastMessage, setToastMessage] = React.useState<string | null>(null);
 
-  // Form State
-  const [formData, setFormData] = React.useState({
-    // Administrative Information
+  // Tracks if user attempted final registration submission
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = React.useState<boolean>(false);
+  const [validationIssues, setValidationIssues] = React.useState<StepValidationIssue[]>([]);
+
+  // Form Schema State (Loaded from LocalStorage or Defaults)
+  const [formSchema, setFormSchema] = React.useState<StudentFormSchema>(
+    INITIAL_STUDENT_FORM_SCHEMA
+  );
+
+  // Load saved schema on mount
+  React.useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SCHEMA_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.activeFields && parsed.unusedFields) {
+          setFormSchema(parsed);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load saved student form schema", err);
+    }
+  }, []);
+
+  // Form Data State
+  const [formData, setFormData] = React.useState<Record<string, any>>({
+    // Administrative
     applicationFormNo: "AF-2083-" + Math.floor(100 + Math.random() * 900),
     sgiNo: "SGI-" + Math.floor(1000 + Math.random() * 9000),
     scholarship: "",
@@ -53,7 +98,7 @@ export default function StudentRegistrationPage() {
     registrationDateBS: "2083-01-15",
     registrationDateAD: new Date().toISOString().split("T")[0],
 
-    // Student Personal Information
+    // Personal
     firstName: "",
     middleName: "",
     lastName: "",
@@ -68,7 +113,7 @@ export default function StudentRegistrationPage() {
     nationality: "Nepali",
     religion: "Hinduism",
 
-    // Contact Information
+    // Contact
     mobile: "+977-98",
     email: "",
     bloodGroup: "O+",
@@ -76,7 +121,7 @@ export default function StudentRegistrationPage() {
     passportNo: "",
     nationalIdNo: "",
 
-    // Academic Details (Step 2)
+    // Academic
     class: "Grade 10",
     section: "Section A",
     rollNumber: "105",
@@ -86,7 +131,7 @@ export default function StudentRegistrationPage() {
     transferCertificateNo: "TC-2082-991",
     isPreviousStudent: false,
 
-    // Address & Guardian Details (Step 3)
+    // Address
     country: "Nepal",
     province: "Bagmati Province",
     district: "Kathmandu",
@@ -95,12 +140,8 @@ export default function StudentRegistrationPage() {
     tole: "Baluwatar",
     address: "Baluwatar-4, Kathmandu",
     sameAsPermanent: true,
-    tempProvince: "Bagmati Province",
-    tempDistrict: "Kathmandu",
-    tempMunicipality: "Kathmandu Metropolitan",
-    tempWardNo: "04",
-    tempAddress: "Baluwatar-4, Kathmandu",
 
+    // Guardian
     guardianName: "",
     relation: "Father",
     guardianMobile: "+977-98",
@@ -109,7 +150,7 @@ export default function StudentRegistrationPage() {
     parentsEducation: "Bachelor's Degree",
     annualIncome: "NPR 1,200,000",
 
-    // Additional & Medical Details (Step 4)
+    // Medical & Additional
     bloodPressure: "115/75",
     heightInch: 62,
     weightKg: 48,
@@ -121,124 +162,110 @@ export default function StudentRegistrationPage() {
     wearsLens: false,
     isHostel: false,
     isBus: true,
-    isDisabled: false,
-    isRemote: false,
 
-    // Documents (Step 5)
+    // Documents
     studentPhotoUploaded: false,
     birthCertUploaded: false,
     tcUploaded: false,
+
+    // Custom Fields Defaults
+    previousRollNo: "",
+    extracurricularInterests: "",
+    alumniOrStaffReference: "",
+    specialAdmissionRemarks: "",
   });
 
   const [errors, setErrors] = React.useState<Record<string, string>>({});
 
-  const validateStep = (stepNumber: number): boolean => {
-    const newErrors: Record<string, string> = {};
+  // Comprehensive multi-step validator
+  const validateAllSteps = (): {
+    isValid: boolean;
+    stepIssues: StepValidationIssue[];
+    allErrors: Record<string, string>;
+  } => {
+    const allErrors: Record<string, string> = {};
+    const stepIssues: StepValidationIssue[] = [];
 
-    if (stepNumber === 1) {
-      if (!formData.firstName.trim()) {
-        newErrors.firstName = "First name is required.";
-      } else if (formData.firstName.trim().length < 2) {
-        newErrors.firstName = "First name must be at least 2 characters.";
-      }
+    STEPS.forEach((step) => {
+      const stepSectionKeys: SectionKey[] = [];
+      if (step.id === 1) stepSectionKeys.push("administrative", "personal", "contact");
+      if (step.id === 2) stepSectionKeys.push("academic");
+      if (step.id === 3) stepSectionKeys.push("address", "guardian");
+      if (step.id === 4) stepSectionKeys.push("medical");
+      if (step.id === 6) stepSectionKeys.push("custom_fields");
 
-      if (!formData.lastName.trim()) {
-        newErrors.lastName = "Last name is required.";
-      } else if (formData.lastName.trim().length < 2) {
-        newErrors.lastName = "Last name must be at least 2 characters.";
-      }
+      const activeFieldsInStep = formSchema.activeFields.filter((f) =>
+        stepSectionKeys.includes(f.section)
+      );
 
-      if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-        newErrors.email = "Please enter a valid email address.";
-      }
-    }
+      const missingInThisStep: string[] = [];
 
-    if (stepNumber === 2) {
-      if (!formData.class.trim()) {
-        newErrors.class = "Class / Grade is required.";
-      }
-      if (!formData.section.trim()) {
-        newErrors.section = "Section is required.";
-      }
-      if (!formData.rollNumber.trim()) {
-        newErrors.rollNumber = "Roll number is required.";
-      }
-      if (!formData.batch.trim()) {
-        newErrors.batch = "Batch session is required.";
-      }
-    }
+      for (const field of activeFieldsInStep) {
+        const val = formData[field.key];
 
-    if (stepNumber === 3) {
-      if (!formData.guardianName.trim()) {
-        newErrors.guardianName = "Guardian name is required.";
-      } else if (formData.guardianName.trim().length < 2) {
-        newErrors.guardianName = "Guardian name must be at least 2 characters.";
-      }
+        // Required check
+        if (field.required) {
+          if (
+            val === undefined ||
+            val === null ||
+            (typeof val === "string" && !val.trim()) ||
+            (field.type === "phone" && val === "+977-98")
+          ) {
+            allErrors[field.key] = `${field.label} is compulsory.`;
+            missingInThisStep.push(field.label);
+            continue;
+          }
+        }
 
-      if (!formData.relation.trim()) {
-        newErrors.relation = "Relationship to student is required.";
-      }
-
-      if (!formData.guardianMobile.trim() || formData.guardianMobile.trim() === "+977-98") {
-        newErrors.guardianMobile = "Guardian mobile number is required.";
+        // Email format check
+        if (field.type === "email" && val && typeof val === "string" && val.trim()) {
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+            allErrors[field.key] = "Please enter a valid email address.";
+            missingInThisStep.push(`${field.label} (Invalid Email)`);
+          }
+        }
       }
 
-      if (formData.guardianEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.guardianEmail.trim())) {
-        newErrors.guardianEmail = "Please enter a valid guardian email.";
+      if (missingInThisStep.length > 0) {
+        stepIssues.push({
+          stepId: step.id,
+          stepLabel: step.label,
+          missingFields: missingInThisStep,
+        });
       }
+    });
 
-      if (!formData.district.trim()) {
-        newErrors.district = "District is required.";
-      }
-      if (!formData.municipality.trim()) {
-        newErrors.municipality = "Municipality is required.";
-      }
-      if (!formData.address.trim()) {
-        newErrors.address = "Street address is required.";
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return {
+      isValid: stepIssues.length === 0,
+      stepIssues,
+      allErrors,
+    };
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    if (errors[name]) {
+  const handleFieldChange = (key: string, value: any) => {
+    if (errors[key]) {
       setErrors((prev) => {
         const next = { ...prev };
-        delete next[name];
+        delete next[key];
         return next;
       });
     }
-    if (type === "checkbox") {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({ ...prev, [name]: checked }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Free Step Navigation without blocking!
   const handleNext = () => {
-    if (!validateStep(currentStep)) {
-      window.scrollTo({ top: 180, behavior: "smooth" });
-      return;
-    }
-    if (currentStep < 5) {
+    if (currentStep < 6) {
       setCurrentStep((prev) => prev + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      // Submit Registration
-      setIsSuccessModalOpen(true);
+      // Final Submit on last step
+      handleSubmitRegistration();
     }
   };
 
   const handleStepClick = (stepId: number) => {
-    if (stepId > currentStep) {
-      if (!validateStep(currentStep)) {
-        return;
-      }
-    }
+    // Allows completely free navigation to any step
     setCurrentStep(stepId);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -250,10 +277,68 @@ export default function StudentRegistrationPage() {
     }
   };
 
-  const progressPercent = Math.round((currentStep / 5) * 100);
+  // Final Submission Handler
+  const handleSubmitRegistration = () => {
+    setHasAttemptedSubmit(true);
+    const { isValid, stepIssues, allErrors } = validateAllSteps();
+
+    setErrors(allErrors);
+    setValidationIssues(stepIssues);
+
+    if (isValid) {
+      setIsSuccessModalOpen(true);
+    } else {
+      setIsValidationModalOpen(true);
+    }
+  };
+
+  // Jump to a specific step from the validation modal
+  const handleJumpToStep = (stepId: number) => {
+    setIsValidationModalOpen(false);
+    setCurrentStep(stepId);
+    window.scrollTo({ top: 120, behavior: "smooth" });
+  };
+
+  // Schema Handlers
+  const handleSaveSchema = (newSchema: StudentFormSchema) => {
+    setFormSchema(newSchema);
+    try {
+      localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(newSchema));
+    } catch (err) {
+      console.error("Failed to persist schema", err);
+    }
+    showToast("Form Layout & Custom Fields saved successfully!");
+  };
+
+  const handleResetSchemaToDefault = () => {
+    setFormSchema(INITIAL_STUDENT_FORM_SCHEMA);
+    try {
+      localStorage.removeItem(SCHEMA_STORAGE_KEY);
+    } catch (err) {
+      console.error("Failed to reset schema", err);
+    }
+    showToast("Reset form layout to default school settings.");
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Helper to get active fields for a section
+  const getSectionActiveFields = (sectionKey: SectionKey): FormFieldDef[] => {
+    return formSchema.activeFields
+      .filter((f) => f.section === sectionKey)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+  };
+
+  // Calculate issue count for a specific step
+  const getStepIssues = (stepId: number) => {
+    return validationIssues.find((issue) => issue.stepId === stepId);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] select-none pb-20">
+    <div className="min-h-screen flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] select-none pb-24">
       {/* 1. Global Top Header */}
       <ErpHeader />
 
@@ -262,7 +347,7 @@ export default function StudentRegistrationPage() {
 
       {/* 3. Main Form Workspace Canvas */}
       <main className="flex-1 max-w-[1280px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Page Top Header Bar matching screenshot */}
+        {/* Page Top Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -276,7 +361,7 @@ export default function StudentRegistrationPage() {
                 Student Registration
               </h1>
               <p className="text-xs text-[var(--neutral-500)]">
-                Register a new student in the system
+                Register a new student in the system (compulsory fields can be completed in any step before final registration)
               </p>
             </div>
           </div>
@@ -291,13 +376,41 @@ export default function StudentRegistrationPage() {
           </button>
         </div>
 
-        {/* 4. Multi-Step Tab Navigation Bar matching reference */}
-        <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-3 space-y-3">
-          <div className="flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar no-scrollbar py-1">
+        {/* Incomplete Submission Alert Banner if attempted */}
+        {hasAttemptedSubmit && validationIssues.length > 0 && (
+          <div className="p-4 rounded-[6px] bg-rose-50 border border-rose-200 flex items-start justify-between gap-3 shadow-2xs animate-in fade-in-0 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="h-7 w-7 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-rose-900">
+                  Compulsory Fields Incomplete ({validationIssues.reduce((acc, i) => acc + i.missingFields.length, 0)} missing)
+                </p>
+                <p className="text-[11px] text-rose-700">
+                  Some required fields marked with an asterisk (*) in {validationIssues.length} step(s) need to be filled before registration can be finalized.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsValidationModalOpen(true)}
+              className="px-3 py-1.5 rounded-[4px] bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-2xs flex items-center gap-1.5 shrink-0 transition-colors cursor-pointer"
+            >
+              <span>View Incomplete List</span>
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* 4. Multi-Step Tab Navigation Bar with Dynamic Status Badges */}
+        <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-3">
+          <div className="flex items-center justify-between gap-2 overflow-x-auto custom-scrollbar no-scrollbar">
             {STEPS.map((step) => {
               const StepIcon = step.icon;
               const isActive = currentStep === step.id;
-              const isPast = currentStep > step.id;
+              const issueForStep = hasAttemptedSubmit ? getStepIssues(step.id) : null;
+              const isStepComplete = hasAttemptedSubmit && !issueForStep;
 
               return (
                 <button
@@ -305,524 +418,124 @@ export default function StudentRegistrationPage() {
                   type="button"
                   onClick={() => handleStepClick(step.id)}
                   className={cn(
-                    "flex-1 min-w-[160px] flex items-center justify-center gap-2 py-2 px-3 rounded-[4px] text-xs font-medium transition-all duration-150 cursor-pointer border select-none",
+                    "flex-1 min-w-[150px] flex items-center justify-center gap-2 py-2 px-3 rounded-[4px] text-xs font-medium transition-all duration-150 cursor-pointer border select-none relative",
                     isActive
                       ? "bg-[var(--red-50)] text-[var(--brand-primary)] font-bold border-[var(--brand-primary)] shadow-2xs"
-                      : isPast
-                      ? "bg-white text-[var(--neutral-700)] border-[var(--border-default)] hover:bg-[var(--neutral-50)]"
-                      : "bg-[var(--neutral-50)]/50 text-[var(--neutral-400)] border-transparent"
+                      : issueForStep
+                      ? "bg-rose-50/50 text-rose-700 border-rose-200 hover:bg-rose-50"
+                      : "bg-white text-[var(--neutral-700)] border-[var(--border-default)] hover:bg-[var(--neutral-50)]"
                   )}
                 >
                   <StepIcon
                     className={cn(
                       "h-3.5 w-3.5 shrink-0",
-                      isActive ? "text-[var(--brand-primary)]" : isPast ? "text-emerald-600" : "text-[var(--neutral-400)]"
+                      isActive
+                        ? "text-[var(--brand-primary)]"
+                        : issueForStep
+                        ? "text-rose-600"
+                        : isStepComplete
+                        ? "text-emerald-600"
+                        : "text-[var(--neutral-500)]"
                     )}
                   />
                   <span className="truncate">{step.label}</span>
-                  {isPast && <CheckCircle2 className="h-3 w-3 text-emerald-600 ml-0.5 shrink-0" />}
+
+                  {/* Dynamic Indicators */}
+                  {issueForStep ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200 shrink-0">
+                      {issueForStep.missingFields.length} missing
+                    </span>
+                  ) : isStepComplete ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600 ml-0.5 shrink-0" />
+                  ) : null}
                 </button>
               );
             })}
           </div>
-
-          {/* Progress Indicator Bar */}
-          <div className="space-y-1.5 pt-1">
-            <div className="flex items-center justify-between text-[11px] font-semibold text-[var(--neutral-500)]">
-              <span>Step {currentStep} of 5</span>
-              <span className="text-[var(--brand-primary)]">{progressPercent}% Complete</span>
-            </div>
-            <div className="w-full h-1.5 bg-[var(--neutral-100)] rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[var(--brand-primary)] transition-all duration-300 rounded-full"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* STEP 1: PERSONAL & ADMINISTRATIVE INFORMATION                             */}
+        {/* STEP 1: ADMINISTRATIVE, PERSONAL & CONTACT INFORMATION                   */}
         {/* ========================================================================= */}
         {currentStep === 1 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
             {/* Section 1: Administrative Information */}
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Administrative Information
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Official use only - Registration and administrative details
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Application Form No.
-                  </label>
-                  <input
-                    type="text"
-                    name="applicationFormNo"
-                    value={formData.applicationFormNo}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
+            {getSectionActiveFields("administrative").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Administrative Information
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Official use only - Registration and administrative details
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    SGI No.
-                  </label>
-                  <input
-                    type="text"
-                    name="sgiNo"
-                    value={formData.sgiNo}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Scholarship
-                  </label>
-                  <select
-                    name="scholarship"
-                    value={formData.scholarship}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="">Select Scholarship</option>
-                    <option value="Merit 100%">Academic Merit 100%</option>
-                    <option value="Merit 50%">Academic Merit 50%</option>
-                    <option value="Need Based">Need-Based Financial Aid</option>
-                    <option value="Sibling 25%">Sibling Concession 25%</option>
-                    <option value="Staff Ward">Staff Ward Concession</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Quota Type
-                  </label>
-                  <select
-                    name="quotaType"
-                    value={formData.quotaType}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="General Quota">General Quota</option>
-                    <option value="Government Quota">Government Quota</option>
-                    <option value="Management Quota">Management Quota</option>
-                    <option value="Differently Abled Quota">Differently Abled Quota</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    University Registration No.
-                  </label>
-                  <input
-                    type="text"
-                    name="universityRegNo"
-                    value={formData.universityRegNo}
-                    onChange={handleChange}
-                    placeholder="e.g. NEB-2083-9941"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Registration Date (BS)
-                  </label>
-                  <input
-                    type="text"
-                    name="registrationDateBS"
-                    value={formData.registrationDateBS}
-                    onChange={handleChange}
-                    placeholder="YYYY-MM-DD (BS)"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Registration Date (AD)
-                  </label>
-                  <input
-                    type="date"
-                    name="registrationDateAD"
-                    value={formData.registrationDateAD}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("administrative").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Section 2: Student Personal Information */}
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Student Personal Information
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Highly preferred for report purpose
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    First Name <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    placeholder="e.g. Aarav"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.firstName
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.firstName && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.firstName}</p>
-                  )}
+            {getSectionActiveFields("personal").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Student Personal Information
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Highly preferred for report and demographic purpose
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Middle Name
-                  </label>
-                  <input
-                    type="text"
-                    name="middleName"
-                    value={formData.middleName}
-                    onChange={handleChange}
-                    placeholder="e.g. Kumar"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Last Name <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleChange}
-                    placeholder="e.g. Sharma"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.lastName
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.lastName && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.lastName}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("personal").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Full Name Nepali
-                  </label>
-                  <input
-                    type="text"
-                    name="fullNameNepali"
-                    value={formData.fullNameNepali}
-                    onChange={handleChange}
-                    placeholder="Type in English, e.g. Rupesh Sharma"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Gender
-                  </label>
-                  <select
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Date of Birth (BS)
-                  </label>
-                  <input
-                    type="text"
-                    name="dobBS"
-                    value={formData.dobBS}
-                    onChange={handleChange}
-                    placeholder="YYYY-MM-DD (BS)"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Date of Birth (AD)
-                  </label>
-                  <input
-                    type="date"
-                    name="dobAD"
-                    value={formData.dobAD}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Ethnic Group
-                  </label>
-                  <select
-                    name="ethnicGroup"
-                    value={formData.ethnicGroup}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Brahmin / Chhetri">Brahmin / Chhetri</option>
-                    <option value="Janajati">Janajati</option>
-                    <option value="Dalit">Dalit</option>
-                    <option value="Madhesi">Madhesi</option>
-                    <option value="Muslim">Muslim</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Caste
-                  </label>
-                  <select
-                    name="caste"
-                    value={formData.caste}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Brahmin">Brahmin</option>
-                    <option value="Chhetri">Chhetri</option>
-                    <option value="Newar">Newar</option>
-                    <option value="Gurung">Gurung</option>
-                    <option value="Magar">Magar</option>
-                    <option value="Rai / Limbu">Rai / Limbu</option>
-                    <option value="Tamang">Tamang</option>
-                    <option value="Yadav">Yadav</option>
-                    <option value="Tharu">Tharu</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Marital Status
-                  </label>
-                  <select
-                    name="maritalStatus"
-                    value={formData.maritalStatus}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Single">Single</option>
-                    <option value="Married">Married</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Language
-                  </label>
-                  <select
-                    name="language"
-                    value={formData.language}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Nepali">Nepali</option>
-                    <option value="English">English</option>
-                    <option value="Maithili">Maithili</option>
-                    <option value="Bhojpuri">Bhojpuri</option>
-                    <option value="Newari">Newari</option>
-                    <option value="Hindi">Hindi</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Nationality
-                  </label>
-                  <select
-                    name="nationality"
-                    value={formData.nationality}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Nepali">Nepali</option>
-                    <option value="Indian">Indian</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Religion
-                  </label>
-                  <select
-                    name="religion"
-                    value={formData.religion}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Hinduism">Hinduism</option>
-                    <option value="Buddhism">Buddhism</option>
-                    <option value="Islam">Islam</option>
-                    <option value="Christianity">Christianity</option>
-                    <option value="Kirat">Kirat</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-            </div>
+            )}
 
             {/* Section 3: Contact Information */}
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Contact Information
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Mandatory selection for email and mobile number for communication purpose
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Mobile
-                  </label>
-                  <input
-                    type="tel"
-                    name="mobile"
-                    value={formData.mobile}
-                    onChange={handleChange}
-                    placeholder="+977-98XXXXXXXX"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
+            {getSectionActiveFields("contact").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Contact Information
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Mandatory selection for email and mobile number for communication purpose
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="student@example.com"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.email
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.email && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.email}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Blood Group
-                  </label>
-                  <select
-                    name="bloodGroup"
-                    value={formData.bloodGroup}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-bold text-red-600"
-                  >
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Citizenship No.
-                  </label>
-                  <input
-                    type="text"
-                    name="citizenshipNo"
-                    value={formData.citizenshipNo}
-                    onChange={handleChange}
-                    placeholder="e.g. 27-01-79-10928"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Passport No.
-                  </label>
-                  <input
-                    type="text"
-                    name="passportNo"
-                    value={formData.passportNo}
-                    onChange={handleChange}
-                    placeholder="e.g. N1293847"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    National ID No.
-                  </label>
-                  <input
-                    type="text"
-                    name="nationalIdNo"
-                    value={formData.nationalIdNo}
-                    onChange={handleChange}
-                    placeholder="e.g. 902-8374-110"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] font-mono"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("contact").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -831,139 +544,30 @@ export default function StudentRegistrationPage() {
         {/* ========================================================================= */}
         {currentStep === 2 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Enrollment & Class Details
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Academic level, section allocation, and session batch
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Class / Grade <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="class"
-                    value={formData.class}
-                    onChange={handleChange}
-                    className={cn(
-                      "w-full h-8 px-2 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.class
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  >
-                    <option value="Grade 10">Grade 10</option>
-                    <option value="Grade 9">Grade 9</option>
-                    <option value="Grade 8">Grade 8</option>
-                    <option value="Grade 7">Grade 7</option>
-                    <option value="Grade 6">Grade 6</option>
-                    <option value="Grade 5">Grade 5</option>
-                  </select>
-                  {errors.class && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.class}</p>
-                  )}
+            {getSectionActiveFields("academic").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Academic Details
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Class admission, batch section, and prior schooling history
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Section <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="section"
-                    value={formData.section}
-                    onChange={handleChange}
-                    className={cn(
-                      "w-full h-8 px-2 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.section
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  >
-                    <option value="Section A">Section A (Sunflower)</option>
-                    <option value="Section B">Section B (Lotus)</option>
-                    <option value="Section C">Section C (Rose)</option>
-                  </select>
-                  {errors.section && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.section}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Roll Number <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="rollNumber"
-                    value={formData.rollNumber}
-                    onChange={handleChange}
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none font-mono font-bold transition-colors",
-                      errors.rollNumber
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.rollNumber && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.rollNumber}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("academic").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Academic Session / Batch <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="batch"
-                    value={formData.batch}
-                    onChange={handleChange}
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.batch
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.batch && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.batch}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Previous School Name
-                  </label>
-                  <input
-                    type="text"
-                    name="previousSchoolName"
-                    value={formData.previousSchoolName}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Previous GPA / Marks
-                  </label>
-                  <input
-                    type="text"
-                    name="previousGradeGpa"
-                    value={formData.previousGradeGpa}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -972,360 +576,94 @@ export default function StudentRegistrationPage() {
         {/* ========================================================================= */}
         {currentStep === 3 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
-            {/* Permanent Address */}
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Permanent Address
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Official municipal residency details
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Province</label>
-                  <select
-                    name="province"
-                    value={formData.province}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Koshi Province">Koshi Province</option>
-                    <option value="Madhesh Province">Madhesh Province</option>
-                    <option value="Bagmati Province">Bagmati Province</option>
-                    <option value="Gandaki Province">Gandaki Province</option>
-                    <option value="Lumbini Province">Lumbini Province</option>
-                    <option value="Karnali Province">Karnali Province</option>
-                    <option value="Sudurpashchim Province">Sudurpashchim Province</option>
-                  </select>
+            {/* Address Information */}
+            {getSectionActiveFields("address").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Address Information
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Permanent residential and location details
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    District <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="district"
-                    value={formData.district}
-                    onChange={handleChange}
-                    placeholder="e.g. Kathmandu"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.district
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.district && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.district}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Municipality / Local Body <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="municipality"
-                    value={formData.municipality}
-                    onChange={handleChange}
-                    placeholder="e.g. Kathmandu Metropolitan"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.municipality
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.municipality && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.municipality}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("address").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Ward No.</label>
-                  <input
-                    type="text"
-                    name="wardNo"
-                    value={formData.wardNo}
-                    onChange={handleChange}
-                    placeholder="e.g. 04"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
+            {/* Guardian Information */}
+            {getSectionActiveFields("guardian").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Guardian & Family Information
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Primary contact person, parent details, and emergency contact
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Tole / Street</label>
-                  <input
-                    type="text"
-                    name="tole"
-                    value={formData.tole}
-                    onChange={handleChange}
-                    placeholder="e.g. Baluwatar"
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Full Street Address <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    placeholder="e.g. Baluwatar-4, Kathmandu"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.address
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.address && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.address}</p>
-                  )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("guardian").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-            </div>
-
-            {/* Parent & Guardian Information */}
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Guardian & Parent Details
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Primary emergency contact and parental background
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Guardian Name <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="guardianName"
-                    value={formData.guardianName}
-                    onChange={handleChange}
-                    placeholder="e.g. Bishnu Sharma"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.guardianName
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.guardianName && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.guardianName}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Relationship <span className="text-red-600">*</span>
-                  </label>
-                  <select
-                    name="relation"
-                    value={formData.relation}
-                    onChange={handleChange}
-                    className={cn(
-                      "w-full h-8 px-2 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.relation
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  >
-                    <option value="Father">Father</option>
-                    <option value="Mother">Mother</option>
-                    <option value="Brother">Brother</option>
-                    <option value="Sister">Sister</option>
-                    <option value="Uncle">Uncle</option>
-                    <option value="Legal Guardian">Legal Guardian</option>
-                  </select>
-                  {errors.relation && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.relation}</p>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Guardian Mobile <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="tel"
-                    name="guardianMobile"
-                    value={formData.guardianMobile}
-                    onChange={handleChange}
-                    placeholder="+977-98XXXXXXXX"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none font-mono transition-colors",
-                      errors.guardianMobile
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.guardianMobile && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.guardianMobile}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">
-                    Guardian Email
-                  </label>
-                  <input
-                    type="email"
-                    name="guardianEmail"
-                    value={formData.guardianEmail}
-                    onChange={handleChange}
-                    placeholder="guardian@example.com"
-                    className={cn(
-                      "w-full h-8 px-3 text-xs bg-white border rounded-[4px] focus:outline-none transition-colors",
-                      errors.guardianEmail
-                        ? "border-red-500 bg-red-50/10"
-                        : "border-[var(--border-default)] focus:border-[var(--brand-primary)]"
-                    )}
-                  />
-                  {errors.guardianEmail && (
-                    <p className="text-[11px] text-red-600 font-medium">{errors.guardianEmail}</p>
-                  )}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 4: ADDITIONAL INFO & MEDICAL                                         */}
+        {/* STEP 4: ADDITIONAL & MEDICAL DETAILS                                      */}
         {/* ========================================================================= */}
         {currentStep === 4 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
-            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
-              <div className="border-b border-[var(--border-default)] pb-3">
-                <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                  Health & Medical Information
-                </h2>
-                <p className="text-xs text-[var(--neutral-500)]">
-                  Physical measurements and medical records
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Height (Inch)</label>
-                  <input
-                    type="number"
-                    name="heightInch"
-                    value={formData.heightInch}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
+            {getSectionActiveFields("medical").length > 0 && (
+              <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+                <div className="border-b border-[var(--border-default)] pb-3">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Additional & Medical Details
+                  </h2>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Health records, transport, hostel, and special accommodations
+                  </p>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Weight (Kg)</label>
-                  <input
-                    type="number"
-                    name="weightKg"
-                    value={formData.weightKg}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Blood Pressure</label>
-                  <input
-                    type="text"
-                    name="bloodPressure"
-                    value={formData.bloodPressure}
-                    onChange={handleChange}
-                    className="w-full h-8 px-3 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Nutrition</label>
-                  <select
-                    name="nutrition"
-                    value={formData.nutrition}
-                    onChange={handleChange}
-                    className="w-full h-8 px-2 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)]"
-                  >
-                    <option value="Good">Good</option>
-                    <option value="Normal">Normal</option>
-                    <option value="Needs Attention">Needs Attention</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("medical").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-[var(--text-primary)]">
-                  Medical Conditions / Allergies
-                </label>
-                <textarea
-                  rows={2}
-                  name="medicalConditions"
-                  value={formData.medicalConditions}
-                  onChange={handleChange}
-                  placeholder="Specify any food/drug allergies, asthma, spectacles..."
-                  className="w-full p-2.5 text-xs bg-white border border-[var(--border-default)] rounded-[4px] focus:outline-none focus:border-[var(--brand-primary)] resize-none"
-                />
-              </div>
-
-              {/* Logistics Facilities Toggles */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3 border-t border-[var(--border-default)]">
-                <label className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="isBus"
-                    checked={formData.isBus}
-                    onChange={handleChange}
-                    className="h-4 w-4 rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
-                  />
-                  <span>Opt for School Bus Transport</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="isHostel"
-                    checked={formData.isHostel}
-                    onChange={handleChange}
-                    className="h-4 w-4 rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
-                  />
-                  <span>Opt for Hostel Facility</span>
-                </label>
-
-                <label className="flex items-center gap-2 text-xs font-medium text-[var(--text-primary)] cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="wearsLens"
-                    checked={formData.wearsLens}
-                    onChange={handleChange}
-                    className="h-4 w-4 rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)]"
-                  />
-                  <span>Wears Spectacles / Contact Lens</span>
-                </label>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* STEP 5: DOCUMENTS & PHOTO UPLOAD                                          */}
+        {/* STEP 5: DOCUMENTS & PHOTO ATTACHMENT                                      */}
         {/* ========================================================================= */}
         {currentStep === 5 && (
           <div className="space-y-5 animate-in fade-in-0 duration-200">
@@ -1346,13 +684,20 @@ export default function StudentRegistrationPage() {
                     <User className="h-5 w-5" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Passport Photo</span>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
+                      Passport Photo
+                    </span>
                     <p className="text-[10px] text-[var(--neutral-500)]">PNG, JPG up to 5MB</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, studentPhotoUploaded: true })}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)]"
+                    onClick={() =>
+                      handleFieldChange(
+                        "studentPhotoUploaded",
+                        !formData.studentPhotoUploaded
+                      )
+                    }
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)] cursor-pointer"
                   >
                     {formData.studentPhotoUploaded ? "✓ Photo Attached" : "Browse Photo"}
                   </button>
@@ -1364,15 +709,24 @@ export default function StudentRegistrationPage() {
                     <FileText className="h-5 w-5" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Birth Certificate</span>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
+                      Birth Certificate
+                    </span>
                     <p className="text-[10px] text-[var(--neutral-500)]">PDF or Image scan</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, birthCertUploaded: true })}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)]"
+                    onClick={() =>
+                      handleFieldChange(
+                        "birthCertUploaded",
+                        !formData.birthCertUploaded
+                      )
+                    }
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)] cursor-pointer"
                   >
-                    {formData.birthCertUploaded ? "✓ Certificate Attached" : "Upload Document"}
+                    {formData.birthCertUploaded
+                      ? "✓ Certificate Attached"
+                      : "Upload Document"}
                   </button>
                 </div>
 
@@ -1382,13 +736,19 @@ export default function StudentRegistrationPage() {
                     <UploadCloud className="h-5 w-5" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Transfer Certificate (TC)</span>
-                    <p className="text-[10px] text-[var(--neutral-500)]">Previous school clearance</p>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">
+                      Transfer Certificate (TC)
+                    </span>
+                    <p className="text-[10px] text-[var(--neutral-500)]">
+                      Previous school clearance
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setFormData({ ...formData, tcUploaded: true })}
-                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)]"
+                    onClick={() =>
+                      handleFieldChange("tcUploaded", !formData.tcUploaded)
+                    }
+                    className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-100)] cursor-pointer"
                   >
                     {formData.tcUploaded ? "✓ TC Document Attached" : "Upload TC"}
                   </button>
@@ -1397,9 +757,80 @@ export default function StudentRegistrationPage() {
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* STEP 6: CUSTOM FIELDS & INSTITUTION-SPECIFIC DATA                         */}
+        {/* ========================================================================= */}
+        {currentStep === 6 && (
+          <div className="space-y-5 animate-in fade-in-0 duration-200">
+            <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
+              <div className="border-b border-[var(--border-default)] pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                      Custom Fields & Additional Data
+                    </h2>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                      Step 6
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--neutral-500)]">
+                    Additional institutional fields, extra remarks, and custom attributes
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCustomizeOpen(true)}
+                  className="px-3 py-1.5 rounded-[4px] bg-[var(--red-50)] text-[var(--brand-primary)] border border-[var(--brand-primary)]/30 hover:bg-[var(--red-50)]/80 text-xs font-semibold flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-2xs transition-colors"
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span>Configure / Add More Fields</span>
+                </button>
+              </div>
+
+              {getSectionActiveFields("custom_fields").length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getSectionActiveFields("custom_fields").map((field) => (
+                    <DynamicFieldRenderer
+                      key={field.id}
+                      field={field}
+                      value={formData[field.key]}
+                      onChange={handleFieldChange}
+                      error={errors[field.key]}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="py-12 px-4 border-2 border-dashed border-[var(--border-default)] rounded-[6px] flex flex-col items-center justify-center text-center space-y-3 bg-[var(--neutral-50)]/30">
+                  <div className="h-12 w-12 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center">
+                    <SlidersHorizontal className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1 max-w-sm">
+                    <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                      No Custom Fields Configured for Step 6
+                    </h3>
+                    <p className="text-xs text-[var(--neutral-500)]">
+                      You can add custom fields (e.g. Previous School Exam ID, Special Concession,
+                      Club Membership) for this school anytime.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomizeOpen(true)}
+                    className="px-3.5 py-1.5 rounded-[4px] bg-[var(--brand-primary)] hover:bg-red-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Settings2 className="h-3.5 w-3.5" />
+                    <span>Open Field Customizer</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
 
-      {/* 5. Bottom Sticky Action Navigation Bar matching screenshot */}
+      {/* 5. Bottom Sticky Action Navigation Bar */}
       <footer className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-[var(--border-default)] px-4 sm:px-8 py-3 shadow-lg">
         <div className="max-w-[1280px] mx-auto flex items-center justify-between">
           {/* Left Actions: Cancel & Save as Draft */}
@@ -1422,7 +853,7 @@ export default function StudentRegistrationPage() {
             </button>
           </div>
 
-          {/* Right Actions: Previous & Next / Submit */}
+          {/* Right Actions: Previous & Next / Submit / Go to Custom Fields */}
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -1434,19 +865,170 @@ export default function StudentRegistrationPage() {
               <span>Previous</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleNext}
-              className="px-4 py-2 rounded-[4px] bg-[var(--brand-primary)] hover:bg-red-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
-            >
-              <span>{currentStep === 5 ? "Submit Registration" : "Next"}</span>
-              {currentStep < 5 && <ChevronRight className="h-4 w-4" />}
-            </button>
+            {currentStep === 5 ? (
+              <>
+                {/* Step 5 Option A: Proceed to Custom Fields (Optional) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(6);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="px-3.5 py-2 rounded-[4px] border border-[var(--brand-primary)] text-xs font-semibold text-[var(--brand-primary)] bg-[var(--red-50)]/40 hover:bg-[var(--red-50)] transition-colors cursor-pointer flex items-center gap-1"
+                >
+                  <span>Custom Fields (Optional)</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+
+                {/* Step 5 Option B: Direct Submit Registration */}
+                <button
+                  type="button"
+                  onClick={handleSubmitRegistration}
+                  className="px-4 py-2 rounded-[4px] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Submit Registration</span>
+                </button>
+              </>
+            ) : currentStep === 6 ? (
+              /* Step 6: Final Submit Registration */
+              <button
+                type="button"
+                onClick={handleSubmitRegistration}
+                className="px-5 py-2 rounded-[4px] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <Check className="h-4 w-4" />
+                <span>Submit Registration</span>
+              </button>
+            ) : (
+              /* Steps 1 to 4: Standard Next */
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-4 py-2 rounded-[4px] bg-[var(--brand-primary)] hover:bg-red-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <span>Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </footer>
 
-      {/* Draft Saved Toast Notification */}
+      {/* ===================================================================== */}
+      {/* INCOMPLETE MANDATORY FIELDS SUMMARY MODAL                             */}
+      {/* ===================================================================== */}
+      {isValidationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in-0">
+          <div className="w-full max-w-lg bg-white rounded-[8px] border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-rose-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className="h-5 w-5 text-amber-300 shrink-0" />
+                <div>
+                  <h3 className="text-sm font-bold">Compulsory Fields Incomplete</h3>
+                  <p className="text-[11px] text-rose-100">
+                    Please fill the mandatory fields (*) to register this student
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsValidationModalOpen(false)}
+                className="p-1 text-white/80 hover:text-white rounded transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* List of Incomplete Steps */}
+            <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              <p className="text-xs text-[var(--neutral-600)]">
+                The following {validationIssues.reduce((acc, i) => acc + i.missingFields.length, 0)} required field(s) across {validationIssues.length} step(s) are missing:
+              </p>
+
+              <div className="space-y-3">
+                {validationIssues.map((issue) => (
+                  <div
+                    key={issue.stepId}
+                    className="p-3.5 rounded-[6px] border border-[var(--border-default)] bg-[var(--neutral-50)]/50 hover:bg-white transition-colors space-y-2 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-5 w-5 rounded-full bg-rose-100 text-rose-700 text-[11px] font-bold flex items-center justify-center shrink-0">
+                          {issue.stepId}
+                        </span>
+                        <span className="text-xs font-bold text-[var(--text-primary)]">
+                          Step {issue.stepId}: {issue.stepLabel}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleJumpToStep(issue.stepId)}
+                        className="px-2.5 py-1 rounded-[4px] bg-[var(--brand-primary)] hover:bg-red-700 text-white text-[11px] font-semibold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <span>Go to Step {issue.stepId}</span>
+                        <ArrowUpRight className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {issue.missingFields.map((fName, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-[3px] bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-semibold"
+                        >
+                          * {fName}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 bg-[var(--neutral-50)] border-t border-[var(--border-default)] flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsValidationModalOpen(false)}
+                className="px-4 py-2 rounded-[4px] border border-[var(--border-default)] bg-white text-xs font-semibold text-[var(--neutral-700)] hover:bg-[var(--neutral-50)] transition-colors cursor-pointer"
+              >
+                Dismiss & Review
+              </button>
+              {validationIssues.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleJumpToStep(validationIssues[0].stepId)}
+                  className="px-4 py-2 rounded-[4px] bg-[var(--brand-primary)] hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  Jump to Step {validationIssues[0].stepId}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification (Custom feedback) */}
+      {toastMessage && (
+        <div className="fixed bottom-16 right-6 z-50 bg-neutral-900 text-white px-4 py-3 rounded-[6px] shadow-2xl border border-neutral-700 flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-3 duration-200">
+          <div className="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <Check className="h-4 w-4" />
+          </div>
+          <p className="text-xs font-medium text-white pr-2">{toastMessage}</p>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="p-1 text-neutral-400 hover:text-white rounded transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Draft Saved Notification */}
       {isDraftSaved && (
         <div className="fixed bottom-16 right-6 z-50 bg-neutral-900 text-white px-4 py-3 rounded-[6px] shadow-2xl border border-neutral-700 flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-3 duration-200">
           <div className="h-6 w-6 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
@@ -1454,7 +1036,9 @@ export default function StudentRegistrationPage() {
           </div>
           <div className="space-y-0.5 pr-2">
             <p className="text-xs font-bold text-white">Draft Saved Locally</p>
-            <p className="text-[11px] text-neutral-300">Your student admission data has been securely saved as a draft.</p>
+            <p className="text-[11px] text-neutral-300">
+              Your student admission data has been securely saved as a draft.
+            </p>
           </div>
           <button
             type="button"
@@ -1466,7 +1050,7 @@ export default function StudentRegistrationPage() {
         </div>
       )}
 
-      {/* 6. Success Modal */}
+      {/* Success Modal */}
       {isSuccessModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in-0">
           <div className="w-full max-w-md bg-white rounded-[6px] border border-[var(--border-default)] shadow-2xl p-6 text-center space-y-4 animate-in zoom-in-95">
@@ -1494,64 +1078,14 @@ export default function StudentRegistrationPage() {
         </div>
       )}
 
-      {/* 7. Customize Fields Modal */}
-      {isCustomizeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in-0">
-          <div className="w-full max-w-lg bg-white rounded-[6px] border border-[var(--border-default)] shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="px-4 py-3 bg-[var(--brand-secondary)] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Settings2 className="h-4 w-4 text-[var(--brand-accent)]" />
-                <span className="text-xs font-bold uppercase tracking-wider">Customize Form Fields</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCustomizeOpen(false)}
-                className="p-1 text-[var(--neutral-400)] hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <p className="text-xs text-[var(--neutral-600)]">
-                Configure mandatory vs optional fields in the student admission form according to your school policy.
-              </p>
-              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
-                {[
-                  "Application Form No.",
-                  "SGI No.",
-                  "University Registration No.",
-                  "Full Name Nepali",
-                  "Ethnic Group & Caste",
-                  "Citizenship / National ID No.",
-                  "Blood Pressure & Medical Details",
-                  "Parent Education & Annual Income",
-                ].map((field) => (
-                  <label
-                    key={field}
-                    className="flex items-center justify-between p-2 rounded border border-[var(--border-default)] text-xs text-[var(--text-primary)] hover:bg-[var(--neutral-50)]"
-                  >
-                    <span>{field}</span>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="rounded text-[var(--brand-primary)] focus:ring-[var(--brand-primary)] h-4 w-4"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="px-4 py-3 bg-[var(--neutral-50)] border-t border-[var(--border-default)] flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsCustomizeOpen(false)}
-                className="px-3 py-1.5 rounded-[4px] bg-[var(--brand-primary)] text-white text-xs font-semibold"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Comprehensive Dynamic Field Customizer Modal */}
+      <FieldCustomizerModal
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+        schema={formSchema}
+        onSave={handleSaveSchema}
+        onResetToDefault={handleResetSchemaToDefault}
+      />
     </div>
   );
 }

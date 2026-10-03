@@ -18,6 +18,9 @@ export const ROUTES = {
   STUDENTS: {
     ROOT: "/students",
     ADMISSION: "/students/admission",
+    DISABLE: "/students/disable",
+    DISABLED: "/students/disabled",
+    DELETED: "/students/deleted",
     DETAIL: (id: string) => `/students/${id}`,
     ATTENDANCE: "/students/attendance",
     PROMOTION: "/students/promotion",

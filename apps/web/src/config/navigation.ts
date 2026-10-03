@@ -79,6 +79,8 @@ import {
   Activity,
   ArrowRight,
   ArrowLeftRight,
+  UserX,
+  Trash2,
 } from "lucide-react";
 import { NavItem } from "@/types/navigation";
 import { ROUTES } from "@/constants/routes";
@@ -113,6 +115,9 @@ export const erpModules: NavItem[] = [
           { title: "Student Registration", href: ROUTES.STUDENTS.ADMISSION, icon: UserPlus },
           { title: "Upgrade Class", href: "/students/upgrade-class", icon: ArrowRight },
           { title: "Change Section", href: "/students/change-section", icon: ArrowLeftRight },
+          { title: "Disable Students", href: ROUTES.STUDENTS.DISABLE, icon: UserX },
+          { title: "Disabled Students", href: ROUTES.STUDENTS.DISABLED, icon: Users },
+          { title: "Deleted Students", href: ROUTES.STUDENTS.DELETED, icon: Trash2 },
         ],
       },
     ],
