@@ -1,0 +1,82 @@
+namespace SchoolERP.Contracts.Organization;
+
+public record OrganizationDto(
+    Guid Id,
+    string Code,
+    string Name,
+    OrganizationType Type,
+    string? Description,
+    string? Email,
+    string? Phone,
+    string? Address,
+    string? City,
+    string? State,
+    string? Country,
+    string? Website,
+    string? LogoUrl,
+    string? Currency,
+    string? TimeZone,
+    bool IsActive,
+    Guid? ParentOrganizationId,
+    int CampusCount,
+    DateTime CreatedAtUtc);
+
+public record OrganizationDetailDto(
+    Guid Id,
+    string Code,
+    string Name,
+    OrganizationType Type,
+    string? Description,
+    string? Email,
+    string? Phone,
+    string? Address,
+    string? City,
+    string? State,
+    string? Country,
+    string? PostalCode,
+    string? Website,
+    string? LogoUrl,
+    string? Currency,
+    string? TimeZone,
+    bool IsActive,
+    Guid? ParentOrganizationId,
+    string? ParentOrganizationName,
+    IReadOnlyList<CampusDto> Campuses,
+    DateTime CreatedAtUtc);
+
+public record CreateOrganizationRequest(
+    string Code,
+    string Name,
+    OrganizationType Type = OrganizationType.School,
+    string? Description = null,
+    string? Email = null,
+    string? Phone = null,
+    string? Address = null,
+    string? City = null,
+    string? State = null,
+    string? Country = null,
+    string? PostalCode = null,
+    string? Website = null,
+    string? LogoUrl = null,
+    string? Currency = "USD",
+    string? TimeZone = "UTC",
+    Guid? ParentOrganizationId = null,
+    string? InitialCampusName = null);
+
+public record UpdateOrganizationRequest(
+    string Name,
+    OrganizationType Type,
+    string? Description = null,
+    string? Email = null,
+    string? Phone = null,
+    string? Address = null,
+    string? City = null,
+    string? State = null,
+    string? Country = null,
+    string? PostalCode = null,
+    string? Website = null,
+    string? LogoUrl = null,
+    string? Currency = "USD",
+    string? TimeZone = "UTC");
+
+public record UpdateOrganizationStatusRequest(bool IsActive);
