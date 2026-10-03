@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+
+# Build Outputs
+.next/
+out/
+build/
+dist/
+bin/
+obj/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Local
+.env*.local
+.env
+!.env.example
+appsettings.*.local.json
+secrets.json
+*.local
+
+# IDEs & OS
+.vs/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.DotSettings.user
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
