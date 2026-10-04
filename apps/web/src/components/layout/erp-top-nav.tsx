@@ -129,7 +129,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
 
     const navWidth = navRef.current.offsetWidth || 1200;
     const hasTwoCols = Boolean(activeModule?.categories && activeModule.categories.length > 1);
-    const modalWidth = hasTwoCols ? 480 : 230;
+    const modalWidth = hasTwoCols ? 560 : 240;
     const itemCenter = activeItemMeta.rectLeft + activeItemMeta.rectWidth / 2;
 
     let modalLeft = hasTwoCols ? itemCenter - modalWidth / 3 : itemCenter - modalWidth / 2;

@@ -9,11 +9,15 @@ export interface NavSubItem {
   badge?: string | number;
   badgeVariant?: "brand" | "success" | "warning" | "error" | "neutral";
   roles?: UserRole[];
+  dividerBefore?: boolean;
 }
 
 export interface NavSubCategory {
   title?: string;
+  headerItem?: NavSubItem;
   items: NavSubItem[];
+  secondaryTitle?: string;
+  secondaryItems?: NavSubItem[];
 }
 
 export interface NavItem {
@@ -28,6 +32,11 @@ export interface NavItem {
   disabled?: boolean;
   categories?: NavSubCategory[]; // For multi-column mega-menu
   children?: NavSubItem[]; // Fallback list
+  footerAction?: {
+    title: string;
+    href: string;
+    icon?: LucideIcon;
+  };
 }
 
 export interface NavSection {
