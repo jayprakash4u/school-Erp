@@ -223,15 +223,9 @@ export default function FeeDuesAndAccountPage() {
             {/* Student Accounts Table */}
             <div className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs overflow-hidden">
               <div className="px-5 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border-default)] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                    Student Fee Accounts ({filteredAccounts.length})
-                  </h2>
-                </div>
-                <span className="text-[11px] text-[var(--text-tertiary)] font-medium">
-                  Click on student to view complete fee account
-                </span>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  Student Fee Accounts
+                </h2>
               </div>
 
               <div className="overflow-x-auto">
