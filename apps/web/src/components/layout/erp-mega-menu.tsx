@@ -27,207 +27,156 @@ export function ErpMegaMenu({
     return null;
   }
 
-  const col1Category = module.categories[0];
-  const col2Category = module.categories[1];
-  const col1Items = col1Category?.items || [];
-  const col2Items = col2Category?.items || [];
-  const hasTwoCols = col2Items.length > 0;
+  const colCount = module.categories.length;
   const footerAction = module.footerAction;
 
-  return (
-    <div
-      className={cn(
-        "absolute top-full z-50 pt-2",
-        className
-      )}
-      onMouseEnter={(e) => e.stopPropagation()}
-      onMouseLeave={onClose}
-    >
-      {/* Invisible hover bridge to prevent premature mouseleave */}
-      <div className="absolute -top-3 left-0 right-0 h-4 bg-transparent" />
+  const widthClass =
+    colCount >= 3
+      ? "w-[94vw] sm:w-[560px] md:w-[840px] max-w-[95vw]"
+      : colCount === 2
+      ? "w-[94vw] sm:w-[560px] max-w-[95vw]"
+      : "w-[94vw] sm:w-[240px] max-w-[95vw]";
 
-      {/* Main Submenu Modal Container - Single or Dual Column */}
+  const gridClass =
+    colCount >= 3
+      ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3"
+      : colCount === 2
+      ? "grid grid-cols-1 sm:grid-cols-2"
+      : "flex flex-col";
+
+  return (
+    <div className={cn("relative z-50 pt-1", className)}>
+      {/* Main Submenu Container */}
       <div
         className={cn(
-          "relative rounded-[8px] bg-white border border-[var(--border-default)] shadow-2xl overflow-hidden text-[var(--text-primary)] select-none animate-in fade-in-0 zoom-in-98 duration-150",
-          hasTwoCols ? "w-[560px] max-w-[95vw]" : "w-[240px]"
+          "relative rounded-[8px] bg-white border border-[var(--border-default)] shadow-2xl overflow-y-auto max-h-[75vh] text-[var(--text-primary)] select-none animate-in fade-in-0 zoom-in-98 duration-150 custom-scrollbar",
+          widthClass
         )}
       >
         {/* Top Triangular Caret Arrow */}
         <div
           className="absolute -top-[5.5px] w-2.5 h-2.5 bg-white border-t border-l border-[var(--border-default)] rotate-45 z-30"
-          style={{ left: `${Math.max(8, Math.min(92, caretLeftPercent))}%` }}
+          style={{ left: `${Math.max(6, Math.min(94, caretLeftPercent))}%` }}
         />
 
-        {/* Submenu Layout */}
-        {hasTwoCols ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 relative z-20">
-            {/* Column 1 - Operations (Primary / Prominent) */}
-            <div className="p-3 sm:p-4 space-y-1 bg-white flex flex-col justify-between">
-              <div>
-                {col1Category?.title && (
-                  <div className="flex items-center gap-1.5 px-2.5 pb-2 mb-1 border-b border-[var(--border-default)]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)] shrink-0" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                      {col1Category.title}
-                    </span>
-                  </div>
-                )}
-                <div className="space-y-0.5">
-                  {col1Items.map((item) => {
-                    const SubIcon = item.icon;
-                    return (
-                      <Link
-                        key={item.title}
-                        href={item.href}
-                        onClick={() => {
-                          onSelectSubItem?.(module, item.title, item.href);
-                          onClose();
-                        }}
-                        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs text-[var(--neutral-800)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] transition-colors"
-                      >
-                        {SubIcon && (
-                          <SubIcon className="h-3.5 w-3.5 text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)] shrink-0 transition-colors" />
-                        )}
-                        <span className="truncate font-medium">{item.title}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+        {/* Dynamic Column Grid */}
+        <div className={cn("relative z-20", gridClass)}>
+          {module.categories.map((cat, colIdx) => {
+            const isFirstCol = colIdx === 0;
+            const isAlternate = colIdx % 2 === 1;
 
-              {/* Column 1 Secondary Items (e.g. Financial Reports) */}
-              {col1Category?.secondaryItems && col1Category.secondaryItems.length > 0 && (
-                <div className="pt-2 mt-2 border-t border-[var(--border-default)] space-y-0.5">
-                  {col1Category.secondaryTitle && (
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] px-2.5 pb-1">
-                      {col1Category.secondaryTitle}
+            return (
+              <div
+                key={cat.title || colIdx}
+                className={cn(
+                  "p-3 sm:p-4 space-y-1 flex flex-col justify-between",
+                  isAlternate ? "bg-[var(--neutral-50)]/50" : "bg-white",
+                  colIdx > 0 && "border-t sm:border-t-0 sm:border-l border-[var(--border-light)]"
+                )}
+              >
+                <div>
+                  {/* Category Header */}
+                  {cat.title && (
+                    <div className="flex items-center gap-1.5 px-2.5 pb-2 mb-1 border-b border-[var(--border-default)]">
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full shrink-0",
+                          isFirstCol
+                            ? "bg-[var(--brand-primary)]"
+                            : colIdx === 1
+                            ? "bg-amber-600"
+                            : "bg-blue-600"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-[10px] uppercase tracking-wider",
+                          isFirstCol
+                            ? "font-bold text-[var(--text-primary)]"
+                            : "font-semibold text-[var(--text-secondary)]"
+                        )}
+                      >
+                        {cat.title}
+                      </span>
                     </div>
                   )}
-                  {col1Category.secondaryItems.map((item) => {
-                    const SubIcon = item.icon;
-                    return (
-                      <Link
-                        key={item.title}
-                        href={item.href}
-                        onClick={() => {
-                          onSelectSubItem?.(module, item.title, item.href);
-                          onClose();
-                        }}
-                        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs font-semibold text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] transition-colors"
-                      >
-                        {SubIcon && (
-                          <SubIcon className="h-3.5 w-3.5 text-[var(--brand-primary)] shrink-0 transition-colors" />
-                        )}
-                        <span className="truncate">{item.title}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
-            {/* Column 2 - Setup / Configuration (Visually Quieter & Secondary) */}
-            <div className="p-3 sm:p-4 space-y-1 bg-[var(--neutral-50)]/50 sm:border-l sm:border-[var(--border-light)] flex flex-col justify-between">
-              <div>
-                {col2Category?.title && (
-                  <div className="flex items-center gap-1.5 px-2.5 pb-2 mb-1 border-b border-[var(--border-default)]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--neutral-400)] shrink-0" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)]">
-                      {col2Category.title}
-                    </span>
+                  {/* Primary Items List */}
+                  <div className="space-y-0.5">
+                    {cat.items.map((item) => {
+                      const SubIcon = item.icon;
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          onClick={() => {
+                            onSelectSubItem?.(module, item.title, item.href);
+                            onClose();
+                          }}
+                          className={cn(
+                            "group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs transition-colors",
+                            isFirstCol
+                              ? "text-[var(--neutral-800)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)]"
+                              : "text-[var(--neutral-700)] hover:text-[var(--neutral-950)] hover:bg-white"
+                          )}
+                        >
+                          {SubIcon && (
+                            <SubIcon
+                              className={cn(
+                                "h-3.5 w-3.5 shrink-0 transition-colors",
+                                isFirstCol
+                                  ? "text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)]"
+                                  : "text-[var(--neutral-400)] group-hover:text-[var(--neutral-700)]"
+                              )}
+                            />
+                          )}
+                          <span className={cn("truncate", isFirstCol ? "font-medium" : "font-normal")}>
+                            {item.title}
+                          </span>
+                        </Link>
+                      );
+                    })}
                   </div>
-                )}
-                <div className="space-y-0.5">
-                  {col2Items.map((item) => {
-                    const SubIcon = item.icon;
-                    return (
-                      <Link
-                        key={item.title}
-                        href={item.href}
-                        onClick={() => {
-                          onSelectSubItem?.(module, item.title, item.href);
-                          onClose();
-                        }}
-                        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs text-[var(--neutral-600)] hover:text-[var(--neutral-900)] hover:bg-white transition-colors"
-                      >
-                        {SubIcon && (
-                          <SubIcon className="h-3.5 w-3.5 text-[var(--neutral-400)] group-hover:text-[var(--neutral-700)] shrink-0 transition-colors" />
-                        )}
-                        <span className="truncate font-normal">{item.title}</span>
-                      </Link>
-                    );
-                  })}
                 </div>
-              </div>
 
-              {/* Column 2 Secondary Items (e.g. Miscellaneous Fees, Installment Plans, Fines, Settings) */}
-              {col2Category?.secondaryItems && col2Category.secondaryItems.length > 0 && (
-                <div className="pt-2 mt-2 border-t border-[var(--border-default)] space-y-0.5">
-                  {col2Category.secondaryTitle && (
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] px-2.5 pb-1">
-                      {col2Category.secondaryTitle}
-                    </div>
-                  )}
-                  {col2Category.secondaryItems.map((item) => {
-                    const SubIcon = item.icon;
-                    return (
-                      <Link
-                        key={item.title}
-                        href={item.href}
-                        onClick={() => {
-                          onSelectSubItem?.(module, item.title, item.href);
-                          onClose();
-                        }}
-                        className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs text-[var(--neutral-600)] hover:text-[var(--neutral-900)] hover:bg-white transition-colors"
-                      >
-                        {SubIcon && (
-                          <SubIcon className="h-3.5 w-3.5 text-[var(--neutral-400)] group-hover:text-[var(--neutral-700)] shrink-0 transition-colors" />
-                        )}
-                        <span className="truncate font-normal">{item.title}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* Single Column Layout */
-          <div className="p-3 space-y-1 relative z-20">
-            {col1Category?.title && (
-              <div className="flex items-center gap-1.5 px-2.5 pb-2 mb-1 border-b border-[var(--border-default)]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)] shrink-0" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-                  {col1Category.title}
-                </span>
-              </div>
-            )}
-            <div className="space-y-0.5">
-              {col1Items.map((item) => {
-                const SubIcon = item.icon;
-                return (
-                  <Link
-                    key={item.title}
-                    href={item.href}
-                    onClick={() => {
-                      onSelectSubItem?.(module, item.title, item.href);
-                      onClose();
-                    }}
-                    className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs text-[var(--neutral-800)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] transition-colors"
-                  >
-                    {SubIcon && (
-                      <SubIcon className="h-3.5 w-3.5 text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)] shrink-0 transition-colors" />
+                {/* Secondary Items in this Column (e.g., Other Setup or Payables) */}
+                {cat.secondaryItems && cat.secondaryItems.length > 0 && (
+                  <div className="pt-2.5 mt-2.5 border-t border-[var(--border-default)] space-y-0.5">
+                    {cat.secondaryTitle && (
+                      <div className="flex items-center gap-1.5 px-2.5 pb-1 mb-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--neutral-400)] shrink-0" />
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)]">
+                          {cat.secondaryTitle}
+                        </span>
+                      </div>
                     )}
-                    <span className="truncate font-medium">{item.title}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                    {cat.secondaryItems.map((item) => {
+                      const SubIcon = item.icon;
+                      return (
+                        <Link
+                          key={item.title}
+                          href={item.href}
+                          onClick={() => {
+                            onSelectSubItem?.(module, item.title, item.href);
+                            onClose();
+                          }}
+                          className="group flex items-center gap-2.5 px-2.5 py-1.5 rounded-[4px] text-xs font-medium text-[var(--neutral-700)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-100)]/60 transition-colors"
+                        >
+                          {SubIcon && (
+                            <SubIcon className="h-3.5 w-3.5 text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)] shrink-0 transition-colors" />
+                          )}
+                          <span className="truncate">{item.title}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
 
-        {/* Footer Action Bar (Separated Financial Reports / Overview) */}
+        {/* Footer Action Bar (e.g. Quick overview link) */}
         {footerAction && (
           <div className="border-t border-[var(--border-default)] bg-[var(--bg-secondary)] px-4 py-2.5">
             <Link

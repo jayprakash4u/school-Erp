@@ -2,17 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
-  // Clone response or create next response
   const response = NextResponse.next();
 
-  // Apply Enterprise Security Headers
-  response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
-  );
+  // Permissive network headers for LAN & multi-device IP access
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  response.headers.set("Access-Control-Allow-Headers", "*");
+  response.headers.set("Referrer-Policy", "no-referrer-when-downgrade");
 
   return response;
 }

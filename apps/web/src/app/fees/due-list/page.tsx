@@ -186,32 +186,6 @@ export default function FeeDuesAndAccountPage() {
         {/* VIEW 1: SEARCH & DIRECTORY (When no student is selected) */}
         {!activeStudent && (
           <div className="space-y-6">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shadow-xs border border-amber-200">
-                  <AlertCircle className="h-5 w-5" />
-                </div>
-                <div>
-                  <h1 className="text-lg font-bold text-[var(--text-primary)]">
-                    Fee Dues & Student Fee Accounts
-                  </h1>
-                  <p className="text-xs text-[var(--text-tertiary)]">
-                    Check outstanding balances, examine fee breakdowns, record external bank payments, and collect dues
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Link
-                  href={ROUTES.FEES.COLLECTION}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[6px] bg-[var(--brand-primary)] text-white text-xs font-semibold hover:bg-[var(--brand-primary-hover)] shadow-xs transition-colors"
-                >
-                  <Receipt className="h-3.5 w-3.5" />
-                  <span>Go to Collect Fee Counter</span>
-                </Link>
-              </div>
-            </div>
 
             {/* Search & Filter Bar */}
             <div className="p-4 rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

@@ -5,7 +5,7 @@ import { z } from "zod";
  * Ensures all required environment variables are set and properly typed.
  */
 const envSchema = z.object({
-  NEXT_PUBLIC_API_URL: z.string().url().default("https://localhost:7001/api"),
+  NEXT_PUBLIC_API_URL: z.string().optional().default(""),
   NEXT_PUBLIC_APP_NAME: z.string().default("School ERP"),
   NEXT_PUBLIC_APP_VERSION: z.string().default("1.0.0"),
   NEXT_PUBLIC_DEFAULT_LOCALE: z.string().default("en"),
@@ -21,7 +21,7 @@ const envSchema = z.object({
 
 const parseEnv = () => {
   const parsed = envSchema.safeParse({
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "",
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
     NEXT_PUBLIC_DEFAULT_LOCALE: process.env.NEXT_PUBLIC_DEFAULT_LOCALE,
@@ -33,7 +33,7 @@ const parseEnv = () => {
     console.error("❌ Invalid environment variables:", parsed.error.format());
     // In browser, return fallback defaults to prevent complete unhandled crashes
     return envSchema.parse({
-      NEXT_PUBLIC_API_URL: "https://localhost:7001/api",
+      NEXT_PUBLIC_API_URL: "",
     });
   }
 

@@ -1,6 +1,33 @@
 import { ApiResponse } from "@/types/common";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://localhost:7001/api";
+/**
+ * Dynamically resolves the API Base URL:
+ * - If running in the browser and NEXT_PUBLIC_API_URL contains localhost, replaces with window.location.hostname
+ * - If NEXT_PUBLIC_API_URL is empty or not set in browser, defaults to "/api" (proxied by Next.js rewrites)
+ * - If in SSR, uses backend internal URL
+ */
+export function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+
+  if (typeof window !== "undefined") {
+    if (envUrl && envUrl.trim().length > 0) {
+      if (envUrl.includes("localhost") || envUrl.includes("127.0.0.1")) {
+        return envUrl.replace(/localhost|127\.0\.0\.1/, window.location.hostname);
+      }
+      return envUrl;
+    }
+    // Default to Next.js API rewrite proxy
+    return "/api";
+  }
+
+  // Server-side rendering (SSR) fallback
+  return (
+    process.env.BACKEND_INTERNAL_URL ||
+    process.env.BACKEND_URL ||
+    envUrl ||
+    "http://127.0.0.1:5272/api"
+  );
+}
 
 export class ApiError extends Error {
   constructor(
@@ -46,7 +73,9 @@ function buildQueryString(params?: Record<string, string | number | boolean | (s
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
   const { params, headers, timeout = 30000, body, ...restOptions } = options;
 
-  const url = `${BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}${buildQueryString(params)}`;
+  const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+  const cleanEndpoint = endpoint.replace(/^\//, "");
+  const url = `${baseUrl}/${cleanEndpoint}${buildQueryString(params)}`;
 
   // Retrieve token if in browser environment
   let token: string | null = null;
@@ -153,7 +182,9 @@ export const apiClient = {
    */
   download: async (endpoint: string, filename?: string, options?: RequestOptions): Promise<void> => {
     const { params, headers } = options || {};
-    const url = `${BASE_URL.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}${buildQueryString(params)}`;
+    const baseUrl = getApiBaseUrl().replace(/\/$/, "");
+    const cleanEndpoint = endpoint.replace(/^\//, "");
+    const url = `${baseUrl}/${cleanEndpoint}${buildQueryString(params)}`;
 
     let token: string | null = null;
     if (typeof window !== "undefined") {

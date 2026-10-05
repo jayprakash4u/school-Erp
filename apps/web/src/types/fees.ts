@@ -57,7 +57,14 @@ export interface PaymentReceipt {
   section: string;
   date: string;
   time: string;
+  subtotalAmount?: number;
+  discountAmount?: number;
+  taxRate?: number;
+  taxAmount?: number;
+  fineAmount?: number;
   totalAmount: number;
+  amountReceived?: number;
+  changeAmount?: number;
   paymentMethod: PaymentMethod;
   transactionRef?: string;
   proofFileName?: string;

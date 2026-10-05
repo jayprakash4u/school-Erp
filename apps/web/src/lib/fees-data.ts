@@ -174,6 +174,41 @@ export const INITIAL_STUDENT_ACCOUNTS: StudentAccount[] = [
       },
     ],
   },
+  {
+    id: "stu-acc-5",
+    studentId: "STU-10250",
+    admissionNo: "ADM-2083-105",
+    fullName: "Ram Kumar",
+    classGrade: "Grade-10",
+    section: "A",
+    rollNo: "08",
+    guardianName: "Shyam Kumar",
+    guardianPhone: "9841556677",
+    charges: [
+      {
+        id: "chg-501",
+        title: "Tuition Fee (Quarter 2)",
+        category: "Tuition",
+        description: "Grade 10 Tuition Fee",
+        totalAmount: 32000,
+        paidAmount: 12000,
+        remainingAmount: 20000,
+        dueDate: "2026-10-15",
+        isMandatory: true,
+      },
+      {
+        id: "chg-502",
+        title: "Board Exam Registration Fee",
+        category: "Examination",
+        description: "Grade 10 National Board Exam Fee",
+        totalAmount: 5000,
+        paidAmount: 0,
+        remainingAmount: 5000,
+        dueDate: "2026-10-25",
+        isMandatory: true,
+      },
+    ],
+  },
 ];
 
 export const INITIAL_TODAY_COLLECTIONS: PaymentReceipt[] = [
@@ -255,15 +290,23 @@ export const INITIAL_TODAY_COLLECTIONS: PaymentReceipt[] = [
   },
 ];
 
-const LOCAL_STORAGE_KEY_STUDENTS = "erp_fee_student_accounts_v2";
-const LOCAL_STORAGE_KEY_RECEIPTS = "erp_fee_today_receipts_v2";
+const LOCAL_STORAGE_KEY_STUDENTS = "erp_fee_student_accounts_v3";
+const LOCAL_STORAGE_KEY_RECEIPTS = "erp_fee_today_receipts_v3";
 
 export function getStoredStudentAccounts(): StudentAccount[] {
   if (typeof window === "undefined") return INITIAL_STUDENT_ACCOUNTS;
   const saved = localStorage.getItem(LOCAL_STORAGE_KEY_STUDENTS);
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed: StudentAccount[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((p) => p.studentId));
+      const missing = INITIAL_STUDENT_ACCOUNTS.filter((init) => !existingIds.has(init.studentId));
+      if (missing.length > 0) {
+        const merged = [...parsed, ...missing];
+        localStorage.setItem(LOCAL_STORAGE_KEY_STUDENTS, JSON.stringify(merged));
+        return merged;
+      }
+      return parsed;
     } catch (e) {
       console.error("Failed to parse stored fee accounts", e);
     }

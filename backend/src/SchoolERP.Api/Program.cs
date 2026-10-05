@@ -41,10 +41,39 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("SchoolErpCorsPolicy", policy =>
     {
-        policy.WithOrigins(allowedOrigins)
+        if (builder.Environment.IsDevelopment())
+        {
+            // In development, permit requests from localhost and all local network IP addresses
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+                try
+                {
+                    var uri = new Uri(origin);
+                    var host = uri.Host.ToLowerInvariant();
+
+                    return host == "localhost"
+                        || host == "127.0.0.1"
+                        || host.StartsWith("192.168.")
+                        || host.StartsWith("10.")
+                        || host.StartsWith("172.");
+                }
+                catch
+                {
+                    return false;
+                }
+            })
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
+        }
+        else
+        {
+            policy.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
     });
 });
 
@@ -65,8 +94,10 @@ if (app.Environment.IsDevelopment())
             .WithTheme(ScalarTheme.Moon);
     });
 }
-
-app.UseHttpsRedirection();
+else
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors("SchoolErpCorsPolicy");
 

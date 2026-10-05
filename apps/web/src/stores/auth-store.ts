@@ -25,11 +25,19 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: null,
-      token: null,
+      user: {
+        id: "usr-admin-01",
+        name: "Dr. Alexander Wright",
+        email: "admin@schoolerp.com",
+        role: "SUPER_ADMIN",
+        schoolId: "sch-sunrise-01",
+        schoolName: "Sunrise Public School",
+        permissions: ["*"],
+      },
+      token: "demo-jwt-token-superadmin",
       refreshToken: null,
-      isAuthenticated: false,
-      activeSchoolId: null,
+      isAuthenticated: true,
+      activeSchoolId: "sch-sunrise-01",
       activeAcademicYear: "2026-2027",
 
       setAuth: ({ user, token, refreshToken }) => {

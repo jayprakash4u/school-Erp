@@ -24,6 +24,7 @@ export interface NavItem {
   id: string;
   order: number;
   title: string;
+  shortTitle?: string;
   href: string;
   icon: LucideIcon;
   badge?: string | number;

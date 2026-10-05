@@ -24,6 +24,11 @@ import {
   X,
   Sparkles,
   ChevronRight,
+  Eye,
+  QrCode,
+  Phone,
+  FileText,
+  Check,
 } from "lucide-react";
 import { ErpHeader } from "@/components/layout/erp-header";
 import { ErpTopNav } from "@/components/layout/erp-top-nav";
@@ -60,9 +65,17 @@ export default function FeeCollectionPage() {
   const [transactionRef, setTransactionRef] = React.useState<string>("");
   const [remarks, setRemarks] = React.useState<string>("");
 
+  // Financial breakdown modifiers
+  const [discountType, setDiscountType] = React.useState<"fixed" | "percent">("fixed");
+  const [discountValue, setDiscountValue] = React.useState<string>("0");
+  const [taxRate, setTaxRate] = React.useState<number>(0);
+  const [fineAmount, setFineAmount] = React.useState<string>("0");
+  const [amountReceived, setAmountReceived] = React.useState<string>("");
+
   // Modal / Receipt state
   const [completedReceipt, setCompletedReceipt] = React.useState<PaymentReceipt | null>(null);
   const [isAddChargeModalOpen, setIsAddChargeModalOpen] = React.useState<boolean>(false);
+  const [printBill, setPrintBill] = React.useState<boolean>(true);
 
   // New charge form
   const [newChargeData, setNewChargeData] = React.useState({
@@ -93,7 +106,7 @@ export default function FeeCollectionPage() {
     return accounts.find((a) => a.studentId === selectedStudentId) || null;
   }, [accounts, selectedStudentId]);
 
-  // When student is selected, reset charge selections
+  // When student is selected, reset charge selections and financial modifiers
   React.useEffect(() => {
     if (activeStudent) {
       const initialMap: Record<string, { selected: boolean; payingAmount: number }> = {};
@@ -110,6 +123,11 @@ export default function FeeCollectionPage() {
       setPaymentMethod("Cash");
       setTransactionRef("");
       setRemarks("");
+      setDiscountType("fixed");
+      setDiscountValue("0");
+      setTaxRate(0);
+      setFineAmount("0");
+      setAmountReceived("");
       setCompletedReceipt(null);
     }
   }, [activeStudent]);
@@ -127,6 +145,41 @@ export default function FeeCollectionPage() {
         a.classGrade.toLowerCase().includes(q)
     );
   }, [accounts, searchQuery]);
+
+  const [searchFocusedIndex, setSearchFocusedIndex] = React.useState<number>(0);
+
+  // Helper to format Grade-Section into clean "Grade-10-A" format
+  const formatGradeSection = (classGrade: string, section: string) => {
+    const g = classGrade.trim().replace(/^Grade\s*/i, "Grade-");
+    const s = section.trim().replace(/^Section\s*/i, "");
+    return s ? `${g}-${s}` : g;
+  };
+
+  // Reset highlighted suggestion index when search query changes
+  React.useEffect(() => {
+    setSearchFocusedIndex(0);
+  }, [searchQuery]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (filteredStudents.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSearchFocusedIndex((prev) => (prev + 1) % filteredStudents.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSearchFocusedIndex((prev) => (prev - 1 + filteredStudents.length) % filteredStudents.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const targetStudent = filteredStudents[searchFocusedIndex] || filteredStudents[0];
+      if (targetStudent) {
+        setSelectedStudentId(targetStudent.studentId);
+        setSearchQuery("");
+      }
+    } else if (e.key === "Escape") {
+      setSearchQuery("");
+    }
+  };
 
   // Toggle charge selection
   const handleToggleCharge = (chargeId: string) => {
@@ -218,10 +271,41 @@ export default function FeeCollectionPage() {
     return { items: list, totalToCollect: total };
   }, [activeStudent, chargeSelections]);
 
+  // Comprehensive billing calculations: Subtotal, Discount, Tax, Fine, Grand Total, Tendered, Change
+  const billingCalculations = React.useMemo(() => {
+    const rawSubtotal = selectedItemsSummary.totalToCollect;
+
+    const discNum = Math.max(0, Number(discountValue) || 0);
+    const calculatedDiscount =
+      discountType === "percent"
+        ? Math.min(rawSubtotal, Math.round(((rawSubtotal * discNum) / 100) * 100) / 100)
+        : Math.min(rawSubtotal, discNum);
+
+    const taxableBase = Math.max(0, rawSubtotal - calculatedDiscount);
+    const calculatedTax = Math.round(((taxableBase * taxRate) / 100) * 100) / 100;
+    const calculatedFine = Math.max(0, Number(fineAmount) || 0);
+    const grandTotal = Math.max(0, Math.round((taxableBase + calculatedTax + calculatedFine) * 100) / 100);
+
+    const receivedNum = amountReceived ? Number(amountReceived) || 0 : grandTotal;
+    const changeDue = Math.max(0, receivedNum - grandTotal);
+
+    return {
+      subtotal: rawSubtotal,
+      discount: calculatedDiscount,
+      taxableBase,
+      taxRate,
+      taxAmount: calculatedTax,
+      fine: calculatedFine,
+      grandTotal,
+      amountReceived: receivedNum,
+      changeDue,
+    };
+  }, [selectedItemsSummary.totalToCollect, discountType, discountValue, taxRate, fineAmount, amountReceived]);
+
   // Execute payment collection
   const handleCollectPayment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activeStudent || selectedItemsSummary.totalToCollect <= 0) return;
+    if (!activeStudent || billingCalculations.grandTotal <= 0) return;
 
     const receiptNumber = `REC-${Date.now().toString().slice(-5)}`;
     const settledItems: SettledFeeItem[] = [];
@@ -269,7 +353,14 @@ export default function FeeCollectionPage() {
       section: activeStudent.section,
       date: new Date().toISOString().split("T")[0],
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      totalAmount: selectedItemsSummary.totalToCollect,
+      subtotalAmount: billingCalculations.subtotal,
+      discountAmount: billingCalculations.discount > 0 ? billingCalculations.discount : undefined,
+      taxRate: billingCalculations.taxRate > 0 ? billingCalculations.taxRate : undefined,
+      taxAmount: billingCalculations.taxAmount > 0 ? billingCalculations.taxAmount : undefined,
+      fineAmount: billingCalculations.fine > 0 ? billingCalculations.fine : undefined,
+      totalAmount: billingCalculations.grandTotal,
+      amountReceived: billingCalculations.amountReceived > 0 ? billingCalculations.amountReceived : undefined,
+      changeAmount: billingCalculations.changeDue > 0 ? billingCalculations.changeDue : undefined,
       paymentMethod,
       transactionRef: transactionRef.trim() || undefined,
       remarks: remarks.trim() || undefined,
@@ -288,7 +379,16 @@ export default function FeeCollectionPage() {
     saveStoredStudentAccounts(updatedAccounts);
     saveStoredReceipts(updatedReceipts);
 
-    setCompletedReceipt(newReceipt);
+    if (printBill) {
+      setCompletedReceipt(newReceipt);
+    } else {
+      // Reset payment form fields for next operation
+      setTransactionRef("");
+      setRemarks("");
+      setDiscountValue("0");
+      setFineAmount("0");
+      setAmountReceived("");
+    }
   };
 
   // Add new on-the-spot charge to student account
@@ -377,195 +477,146 @@ export default function FeeCollectionPage() {
         {/* View Mode 1: Search & Landing Station (When no student is selected) */}
         {!activeStudent && (
           <div className="space-y-6">
-            {/* Cashier Welcome & Search Card */}
-            <div className="p-6 rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-[var(--brand-primary)] text-white flex items-center justify-center shadow-xs">
-                    <Receipt className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h1 className="text-lg font-bold text-[var(--text-primary)]">
-                      Fee Collection Counter
-                    </h1>
-                    <p className="text-xs text-[var(--text-tertiary)]">
-                      Search student to view outstanding charges, tuition dues, and collect payments
-                    </p>
-                  </div>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[11px] text-[var(--text-tertiary)] font-medium block">
-                    Cashier Terminal
-                  </span>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    Counter Active
-                  </span>
-                </div>
-              </div>
-
-              {/* Large Instant Search Input */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
-                  Student Search
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--neutral-400)]" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search student by name, admission no. (e.g. STU-10245), or phone..."
-                    className="w-full h-11 pl-10 pr-4 text-sm bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[6px] text-[var(--text-primary)] placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-all"
-                    autoFocus
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600 rounded"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Instant Search Results Dropdown / Panel */}
-                {searchQuery.trim() !== "" && (
-                  <div className="rounded-[6px] border border-[var(--brand-primary)]/40 bg-white shadow-lg overflow-hidden animate-in fade-in-0 duration-150">
-                    <div className="px-4 py-2 bg-[var(--bg-secondary)] border-b border-[var(--border-default)] flex items-center justify-between text-xs">
-                      <span className="font-semibold text-[var(--text-secondary)]">
-                        Matching Students ({filteredStudents.length})
-                      </span>
-                      <span className="text-[11px] text-[var(--text-tertiary)]">
-                        Click student to view fee overview
-                      </span>
-                    </div>
-
-                    {filteredStudents.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-[var(--text-tertiary)]">
-                        No student found matching &quot;{searchQuery}&quot;. Try searching with student ID, name, or phone.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-[var(--border-light)] max-h-80 overflow-y-auto">
-                        {filteredStudents.map((stu) => {
-                          const totals = calculateStudentTotals(stu);
-                          return (
-                            <div
-                              key={stu.studentId}
-                              onClick={() => {
-                                setSelectedStudentId(stu.studentId);
-                                setSearchQuery("");
-                              }}
-                              className="p-3.5 hover:bg-[var(--red-50)]/40 cursor-pointer transition-colors flex items-center justify-between group"
-                            >
-                              <div className="flex items-center gap-3">
-                                <div className="h-9 w-9 rounded-full bg-[var(--neutral-100)] group-hover:bg-[var(--red-100)] text-[var(--brand-primary)] font-bold text-xs flex items-center justify-center transition-colors">
-                                  {stu.fullName.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                  <div className="text-xs font-bold text-[var(--text-primary)] group-hover:text-[var(--brand-primary)] transition-colors">
-                                    {stu.fullName}
-                                    <span className="ml-2 text-[11px] font-mono text-[var(--text-tertiary)] font-normal">
-                                      ({stu.studentId})
-                                    </span>
-                                  </div>
-                                  <div className="text-[11px] text-[var(--text-tertiary)]">
-                                    {stu.classGrade} - {stu.section} • Roll: {stu.rollNo} • Phone: {stu.guardianPhone}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="text-right">
-                                <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)] block">
-                                  Outstanding Due
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-xs font-bold",
-                                    totals.totalOutstanding > 0 ? "text-rose-600" : "text-emerald-600"
-                                  )}
-                                >
-                                  NPR {totals.totalOutstanding.toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+            {/* Student Search Input */}
+            <div className="max-w-xl relative">
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--neutral-400)]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  placeholder="Search student by name, student ID, or roll..."
+                  className="w-full h-10 pl-9 pr-8 text-xs sm:text-sm bg-white border border-[var(--border-default)] rounded-[6px] text-[var(--text-primary)] placeholder:text-[var(--neutral-400)] focus:outline-none focus:border-[var(--brand-primary)] focus:bg-white transition-all shadow-xs"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-neutral-400 hover:text-neutral-600 rounded"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 )}
               </div>
+
+              {/* Instant Search Results Dropdown / Suggestions Panel */}
+              {searchQuery.trim() !== "" && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-40 rounded-[6px] border border-[var(--border-default)] bg-white shadow-lg overflow-hidden">
+                  {filteredStudents.length === 0 ? (
+                    <div className="p-3 text-center text-xs text-[var(--text-tertiary)]">
+                      No student found matching &quot;{searchQuery}&quot;
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[var(--border-light)] max-h-64 overflow-y-auto">
+                      {filteredStudents.map((stu, idx) => {
+                        const isFocused = idx === searchFocusedIndex;
+                        const formattedGrade = formatGradeSection(stu.classGrade, stu.section);
+
+                        return (
+                          <div
+                            key={stu.studentId}
+                            onClick={() => {
+                              setSelectedStudentId(stu.studentId);
+                              setSearchQuery("");
+                            }}
+                            onMouseEnter={() => setSearchFocusedIndex(idx)}
+                            className={cn(
+                              "px-3.5 py-2 cursor-pointer transition-colors select-none text-left",
+                              isFocused
+                                ? "bg-neutral-100"
+                                : "hover:bg-neutral-50"
+                            )}
+                          >
+                            <div className="text-xs font-semibold text-neutral-900 leading-snug">
+                              {stu.fullName}{" "}
+                              <span className="font-normal text-neutral-500">
+                                ({stu.studentId})
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-neutral-500 mt-0.5 leading-snug">
+                              Roll: {stu.rollNo || "—"} - {formattedGrade}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Today's Collections Log */}
+            {/* Recent Collections */}
             <div className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs overflow-hidden">
               <div className="px-5 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border-default)] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                    Today&apos;s Collections Log
-                  </h2>
-                </div>
-                <div className="text-xs font-semibold text-[var(--text-secondary)]">
-                  Total Collected Today:{" "}
-                  <span className="font-bold text-emerald-700">
-                    NPR{" "}
-                    {receipts
-                      .reduce((sum, r) => sum + r.totalAmount, 0)
-                      .toLocaleString()}
-                  </span>
-                </div>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
+                  Recent Collections
+                </h2>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-xs border-collapse border-t border-[var(--border-default)]">
                   <thead>
-                    <tr className="border-b border-[var(--border-default)] text-[var(--text-secondary)] font-semibold bg-neutral-50/50">
-                      <th className="py-2.5 px-4">Receipt No.</th>
-                      <th className="py-2.5 px-4">Student</th>
-                      <th className="py-2.5 px-4">Class</th>
-                      <th className="py-2.5 px-4">Amount Paid</th>
-                      <th className="py-2.5 px-4">Method</th>
-                      <th className="py-2.5 px-4">Time</th>
+                    <tr className="border-b border-[var(--border-default)] text-neutral-800 font-semibold bg-neutral-50/70">
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Receipt No.</th>
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Student Name</th>
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Class</th>
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Amount Paid</th>
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Method</th>
+                      <th className="py-2.5 px-4 border-r border-[var(--border-default)]">Time</th>
                       <th className="py-2.5 px-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--border-light)]">
+                  <tbody className="divide-y divide-[var(--border-default)]">
                     {receipts.map((rec) => (
-                      <tr key={rec.id} className="hover:bg-[var(--neutral-50)]/60 transition-colors">
-                        <td className="py-3 px-4 font-mono font-bold text-[var(--brand-primary)]">
+                      <tr key={rec.id} className="hover:bg-neutral-50/80 transition-colors">
+                        <td className="py-2.5 px-4 font-mono font-bold text-[var(--brand-primary)] border-r border-[var(--border-default)]">
                           {rec.receiptNo}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-4 border-r border-[var(--border-default)]">
                           <button
                             onClick={() => setSelectedStudentId(rec.studentId)}
-                            className="font-semibold text-[var(--text-primary)] hover:text-[var(--brand-primary)] hover:underline text-left"
+                            className="font-medium text-neutral-900 hover:text-[var(--brand-primary)] text-left"
                           >
                             {rec.studentName}
                           </button>
                         </td>
-                        <td className="py-3 px-4 text-[var(--text-secondary)]">
+                        <td className="py-2.5 px-4 text-neutral-700 border-r border-[var(--border-default)]">
                           {rec.classGrade} - {rec.section}
                         </td>
-                        <td className="py-3 px-4 font-bold text-emerald-700">
-                          NPR {rec.totalAmount.toLocaleString()}
+                        <td className="py-2.5 px-4 font-normal text-neutral-900 border-r border-[var(--border-default)]">
+                          NPR {rec.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded bg-neutral-100 font-medium text-[10px] text-neutral-700">
+                        <td className="py-2.5 px-4 border-r border-[var(--border-default)]">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-neutral-100 text-neutral-700 border border-neutral-200 text-[11px] font-medium">
                             {rec.paymentMethod}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-[var(--text-tertiary)]">{rec.time}</td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => setCompletedReceipt(rec)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--bg-secondary)] hover:bg-[var(--red-50)] text-[var(--brand-primary)] border border-[var(--border-default)] text-[11px] font-semibold transition-colors"
-                            title="View Receipt"
-                          >
-                            <Printer className="h-3 w-3" />
-                            <span>Receipt</span>
-                          </button>
+                        <td className="py-2.5 px-4 text-neutral-600 border-r border-[var(--border-default)]">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-neutral-400 shrink-0" />
+                            {rec.time}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 text-right">
+                          <div className="inline-flex items-center gap-1.5 justify-end">
+                            <button
+                              onClick={() => setSelectedStudentId(rec.studentId)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white hover:bg-neutral-50 text-neutral-700 border border-[var(--border-default)] text-[11px] font-semibold transition-colors"
+                              title="View Student Desk"
+                            >
+                              <Eye className="h-3 w-3 text-neutral-500" />
+                              <span>View</span>
+                            </button>
+                            <button
+                              onClick={() => setCompletedReceipt(rec)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--bg-secondary)] hover:bg-[var(--red-50)] text-[var(--brand-primary)] border border-[var(--border-default)] text-[11px] font-semibold transition-colors"
+                              title="View Receipt"
+                            >
+                              <Printer className="h-3 w-3" />
+                              <span>Receipt</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -579,152 +630,168 @@ export default function FeeCollectionPage() {
         {/* View Mode 2: Student Fee Overview & Collection Desk (When student is selected) */}
         {activeStudent && (
           <div className="space-y-6">
-            {/* Top Navigation & Student Header */}
-            <div className="p-5 rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setSelectedStudentId(null)}
-                    className="p-1.5 rounded-[6px] border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--neutral-100)] hover:text-[var(--text-primary)] transition-colors"
-                    title="Back to Search"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-base font-bold text-[var(--text-primary)]">
+            {/* Top Navigation Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <button
+                onClick={() => setSelectedStudentId(null)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-white border border-[var(--border-default)] hover:bg-neutral-50 text-xs font-semibold text-neutral-700 transition-colors shadow-2xs w-fit"
+              >
+                <ArrowLeft className="h-3.5 w-3.5 text-neutral-500" />
+                <span>Back to Student Search</span>
+              </button>
+
+              <button
+                onClick={() => setIsAddChargeModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[6px] bg-white border border-[var(--border-default)] hover:bg-neutral-50 text-xs font-semibold text-[var(--brand-primary)] transition-colors shadow-2xs w-fit cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add One-off / Misc Charge</span>
+              </button>
+            </div>
+
+            {/* Humanized Student Profile & Financial Summary Card */}
+            <div className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs p-5 lg:p-6 space-y-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                {/* Student Profile Info */}
+                <div className="flex items-start gap-4">
+                  <div className="h-14 w-14 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 font-bold text-lg flex items-center justify-center shrink-0">
+                    {activeStudent.fullName.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-lg sm:text-xl font-bold text-neutral-900 leading-none">
                         {activeStudent.fullName}
                       </h1>
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-default)] text-[var(--text-secondary)] font-medium">
+                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-neutral-100 border border-neutral-200 text-neutral-700">
                         {activeStudent.studentId}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                      {activeStudent.classGrade} · {activeStudent.section} · Admission: {activeStudent.admissionNo} · Guardian: {activeStudent.guardianName} ({activeStudent.guardianPhone})
-                    </p>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-600">
+                      <span className="font-medium text-neutral-800">
+                        {activeStudent.classGrade} - {activeStudent.section}
+                      </span>
+                      <span className="text-neutral-300">•</span>
+                      <span>Roll: {activeStudent.rollNo || "—"}</span>
+                      <span className="text-neutral-300">•</span>
+                      <span>Adm No: {activeStudent.admissionNo}</span>
+                    </div>
+
+                    <div className="text-xs text-neutral-500 flex items-center gap-1.5 pt-0.5">
+                      <User className="h-3 w-3 text-neutral-400" />
+                      <span>Guardian: {activeStudent.guardianName}</span>
+                      <span className="text-neutral-300">•</span>
+                      <Phone className="h-3 w-3 text-neutral-400 ml-1" />
+                      <span>{activeStudent.guardianPhone}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsAddChargeModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-white border border-[var(--border-default)] hover:bg-[var(--neutral-50)] text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5 text-[var(--brand-primary)]" />
-                    <span>Add One-off / Misc Charge</span>
-                  </button>
-                </div>
+                {/* 3-Pillar Financial Balances */}
+                {studentTotals && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto lg:min-w-[480px]">
+                    <div className="p-3.5 rounded-[6px] bg-neutral-50 border border-neutral-200">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 block">
+                        Total Charges
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-neutral-900 mt-0.5 block">
+                        NPR {studentTotals.totalFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-[6px] bg-neutral-50 border border-neutral-200">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 block">
+                        Total Paid
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-neutral-900 mt-0.5 block">
+                        NPR {studentTotals.totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 rounded-[6px] bg-neutral-50 border border-neutral-200">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 block">
+                        Outstanding Due
+                      </span>
+                      <span className="text-sm sm:text-base font-bold text-red-600 mt-0.5 block">
+                        NPR {studentTotals.totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* 3-Pillar KPI Banner: Total Charges, Total Paid, Outstanding Due */}
-              {studentTotals && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-3.5 rounded-[6px] bg-neutral-50 border border-[var(--border-default)] flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-tertiary)] block">
-                        Total Fees / Charges
-                      </span>
-                      <span className="text-base font-bold text-[var(--text-primary)]">
-                        NPR {studentTotals.totalFees.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="h-8 w-8 rounded-full bg-neutral-200 text-neutral-600 flex items-center justify-center">
-                      <Coins className="h-4 w-4" />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-[6px] bg-emerald-50/70 border border-emerald-200 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">
-                        Total Paid Amount
-                      </span>
-                      <span className="text-base font-bold text-emerald-700">
-                        NPR {studentTotals.totalPaid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="h-8 w-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 rounded-[6px] bg-rose-50/70 border border-rose-200 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800 block">
-                        Outstanding Due Balance
-                      </span>
-                      <span className="text-base font-bold text-rose-700">
-                        NPR {studentTotals.totalOutstanding.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="h-8 w-8 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center">
-                      <AlertCircle className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* 2-Column Collection Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Columns: Outstanding Charges Selection & Partial Payment Table */}
-              <div className="lg:col-span-2 space-y-4">
+              {/* Left 2 Columns: Outstanding Charges Selection Table */}
+              <div className="lg:col-span-2 space-y-5">
                 <div className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs overflow-hidden">
                   <div className="px-5 py-3.5 bg-[var(--bg-secondary)] border-b border-[var(--border-default)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-[var(--brand-primary)]" />
-                      <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                        Outstanding Fees &amp; Charges ({outstandingCharges.length})
-                      </h2>
-                    </div>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-neutral-800">
+                      Outstanding Fees &amp; Charges
+                    </h2>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleSelectAllOutstanding}
-                        className="px-2.5 py-1 rounded-[4px] bg-white border border-[var(--border-default)] hover:border-[var(--brand-primary)] text-[11px] font-semibold text-[var(--brand-primary)] transition-colors cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-white border border-[var(--border-default)] hover:bg-neutral-50 text-[11px] font-medium text-neutral-700 transition-colors cursor-pointer"
                       >
-                        Select All Outstanding
+                        Select All
                       </button>
                       <button
                         type="button"
                         onClick={handleClearSelection}
-                        className="px-2.5 py-1 rounded-[4px] bg-white border border-[var(--border-default)] hover:bg-neutral-50 text-[11px] font-medium text-neutral-600 transition-colors cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-white border border-[var(--border-default)] hover:bg-neutral-50 text-[11px] font-medium text-neutral-700 transition-colors cursor-pointer"
                       >
-                        Clear
+                        Clear Selection
                       </button>
                     </div>
                   </div>
 
                   {outstandingCharges.length === 0 ? (
-                    <div className="p-8 text-center space-y-2">
-                      <CheckCircle2 className="h-8 w-8 text-emerald-600 mx-auto" />
-                      <h3 className="text-xs font-bold text-emerald-800">All Charges Cleared!</h3>
-                      <p className="text-[11px] text-[var(--text-tertiary)]">
-                        This student has zero outstanding fees.
+                    <div className="p-10 text-center space-y-2">
+                      <CheckCircle2 className="h-8 w-8 text-neutral-400 mx-auto" />
+                      <h3 className="text-xs font-bold text-neutral-800">All Charges Cleared</h3>
+                      <p className="text-[11px] text-neutral-500">
+                        This student currently has zero outstanding dues.
                       </p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <table className="w-full text-left text-xs border-collapse border-t border-[var(--border-default)]">
                         <thead>
-                          <tr className="border-b border-[var(--border-default)] text-[var(--text-secondary)] font-semibold bg-neutral-50/50">
-                            <th className="py-2.5 px-3 text-center w-10">Pay</th>
-                            <th className="py-2.5 px-4">Fee Head &amp; Particulars</th>
-                            <th className="py-2.5 px-3">Due Date</th>
-                            <th className="py-2.5 px-3 text-right">Total Charge</th>
-                            <th className="py-2.5 px-3 text-right">Paid</th>
-                            <th className="py-2.5 px-3 text-right">Remaining Due</th>
-                            <th className="py-2.5 px-4 text-right w-36">Paying Now (NPR)</th>
+                          <tr className="border-b border-[var(--border-default)] text-neutral-800 font-semibold bg-neutral-50/70">
+                            <th className="py-2.5 px-3 text-center w-10 border-r border-[var(--border-default)]">
+                              Pay
+                            </th>
+                            <th className="py-2.5 px-4 border-r border-[var(--border-default)]">
+                              Fee Particulars
+                            </th>
+                            <th className="py-2.5 px-3 border-r border-[var(--border-default)]">
+                              Due Date
+                            </th>
+                            <th className="py-2.5 px-3 text-right border-r border-[var(--border-default)]">
+                              Total Charge
+                            </th>
+                            <th className="py-2.5 px-3 text-right border-r border-[var(--border-default)]">
+                              Paid
+                            </th>
+                            <th className="py-2.5 px-3 text-right border-r border-[var(--border-default)] text-red-600 font-semibold">
+                              Remaining Due
+                            </th>
+                            <th className="py-2.5 px-4 text-right w-36">
+                              Paying Now (NPR)
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[var(--border-light)]">
+                        <tbody className="divide-y divide-[var(--border-default)]">
                           {outstandingCharges.map((charge) => {
                             const sel = chargeSelections[charge.id] || {
                               selected: false,
                               payingAmount: charge.remainingAmount,
                             };
                             const isSelected = sel.selected;
-                            const isPartial = isSelected && sel.payingAmount < charge.remainingAmount;
                             const remainingAfter = Math.max(0, charge.remainingAmount - (isSelected ? sel.payingAmount : 0));
 
                             return (
@@ -732,43 +799,46 @@ export default function FeeCollectionPage() {
                                 key={charge.id}
                                 className={cn(
                                   "transition-colors",
-                                  isSelected ? "bg-[var(--red-50)]/40" : "hover:bg-[var(--neutral-50)]/60"
+                                  isSelected ? "bg-neutral-50" : "hover:bg-neutral-50/50"
                                 )}
                               >
-                                <td className="py-3 px-3 text-center">
+                                <td className="py-3 px-3 text-center border-r border-[var(--border-default)]">
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => handleToggleCharge(charge.id)}
-                                    className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--brand-primary)] focus:ring-0 cursor-pointer"
+                                    className="h-4 w-4 rounded border-[var(--border-default)] text-neutral-900 focus:ring-0 cursor-pointer"
                                   />
                                 </td>
-                                <td className="py-3 px-4">
+                                <td className="py-3 px-4 border-r border-[var(--border-default)]">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-bold text-[var(--text-primary)]">
+                                    <span className="font-semibold text-neutral-900">
                                       {charge.title}
                                     </span>
-                                    <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-[10px] font-medium text-neutral-600">
+                                    <span className="px-1.5 py-0.5 rounded bg-neutral-100 border border-neutral-200 text-[10px] font-medium text-neutral-600">
                                       {charge.category}
                                     </span>
                                   </div>
                                   {charge.description && (
-                                    <p className="text-[11px] text-[var(--text-tertiary)] mt-0.5">
+                                    <p className="text-[11px] text-neutral-500 mt-0.5">
                                       {charge.description}
                                     </p>
                                   )}
                                 </td>
-                                <td className="py-3 px-3 text-[var(--text-secondary)] whitespace-nowrap">
-                                  {charge.dueDate}
+                                <td className="py-3 px-3 text-neutral-600 border-r border-[var(--border-default)] whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Calendar className="h-3 w-3 text-neutral-400" />
+                                    {charge.dueDate}
+                                  </span>
                                 </td>
-                                <td className="py-3 px-3 text-right text-[var(--text-secondary)]">
-                                  {charge.totalAmount.toLocaleString()}
+                                <td className="py-3 px-3 text-right text-neutral-800 border-r border-[var(--border-default)]">
+                                  {charge.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-3 px-3 text-right text-emerald-600 font-medium">
-                                  {charge.paidAmount.toLocaleString()}
+                                <td className="py-3 px-3 text-right text-neutral-700 border-r border-[var(--border-default)]">
+                                  {charge.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="py-3 px-3 text-right font-bold text-rose-700">
-                                  NPR {charge.remainingAmount.toLocaleString()}
+                                <td className="py-3 px-3 text-right font-bold text-red-600 border-r border-[var(--border-default)]">
+                                  {charge.remainingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </td>
                                 <td className="py-3 px-4 text-right">
                                   <div className="space-y-1">
@@ -781,16 +851,16 @@ export default function FeeCollectionPage() {
                                       disabled={!isSelected}
                                       placeholder={charge.remainingAmount.toString()}
                                       className={cn(
-                                        "w-full h-7 px-2 text-right rounded border text-xs font-bold transition-all",
+                                        "w-full h-7 px-2 text-right rounded border text-xs font-semibold transition-all",
                                         isSelected
-                                          ? "border-[var(--brand-primary)] bg-white text-[var(--brand-primary)]"
-                                          : "border-[var(--border-default)] bg-neutral-100 text-neutral-400 cursor-not-allowed"
+                                          ? "border-neutral-400 bg-white text-neutral-900 focus:outline-none focus:border-neutral-900"
+                                          : "border-neutral-200 bg-neutral-100 text-neutral-400 cursor-not-allowed"
                                       )}
                                     />
                                     {isSelected && (
                                       <div className="text-[10px] text-neutral-500 text-right">
                                         {remainingAfter === 0 ? (
-                                          <span className="text-emerald-600 font-medium">Full Settle</span>
+                                          <span className="text-neutral-600 font-medium">Full Settle</span>
                                         ) : (
                                           <span>After: NPR {remainingAfter.toLocaleString()}</span>
                                         )}
@@ -802,6 +872,19 @@ export default function FeeCollectionPage() {
                             );
                           })}
                         </tbody>
+                        <tfoot className="border-t-2 border-[var(--border-default)] bg-neutral-50/80 font-semibold text-neutral-800">
+                          <tr>
+                            <td colSpan={3} className="py-2.5 px-4 text-right uppercase text-[11px] text-neutral-500 border-r border-[var(--border-default)]">
+                              Subtotal (Selected Items):
+                            </td>
+                            <td colSpan={3} className="py-2.5 px-3 text-right border-r border-[var(--border-default)] text-neutral-900 font-bold">
+                              NPR {billingCalculations.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-bold text-neutral-900">
+                              NPR {billingCalculations.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   )}
@@ -811,10 +894,10 @@ export default function FeeCollectionPage() {
                 {paidCharges.length > 0 && (
                   <div className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs p-4">
                     <div className="flex items-center justify-between pb-2 border-b border-[var(--border-light)]">
-                      <span className="text-xs font-bold text-neutral-600">
+                      <span className="text-xs font-bold text-neutral-700">
                         Previously Fully Paid Charges ({paidCharges.length})
                       </span>
-                      <span className="text-[11px] text-emerald-600 font-semibold">✓ Settled</span>
+                      <span className="text-[11px] text-neutral-600 font-semibold">✓ Settled</span>
                     </div>
                     <div className="mt-2 divide-y divide-[var(--border-light)] text-xs">
                       {paidCharges.map((pc) => (
@@ -823,8 +906,8 @@ export default function FeeCollectionPage() {
                             <span className="font-medium text-neutral-800">{pc.title}</span>
                             <span className="text-[10px] text-neutral-400 ml-2">({pc.category})</span>
                           </div>
-                          <span className="font-medium text-emerald-700">
-                            NPR {pc.paidAmount.toLocaleString()} Paid
+                          <span className="font-normal text-neutral-800">
+                            NPR {pc.paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Paid
                           </span>
                         </div>
                       ))}
@@ -837,101 +920,202 @@ export default function FeeCollectionPage() {
               <div className="space-y-4">
                 <form
                   onSubmit={handleCollectPayment}
-                  className="p-5 rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs space-y-4 text-xs"
+                  className="rounded-[8px] bg-white border border-[var(--border-default)] shadow-xs p-5 space-y-4 text-xs"
                 >
-                  <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)]">
-                      Payment Settlement
+                  {/* Form Header */}
+                  <div className="pb-3 border-b border-neutral-200">
+                    <h2 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">
+                      Collection Settlement
                     </h2>
-                    <span className="text-[11px] font-semibold text-[var(--brand-primary)]">
-                      {selectedItemsSummary.items.length} Selected
-                    </span>
                   </div>
 
-                  {/* Selected Items Breakdown List */}
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-tertiary)] block">
-                      Selected Fee Items
-                    </span>
-
-                    {selectedItemsSummary.items.length === 0 ? (
-                      <div className="p-4 rounded-[6px] bg-[var(--bg-secondary)] text-center text-neutral-500 text-xs">
-                        No charges selected yet. Check the boxes on the left to collect payment.
-                      </div>
-                    ) : (
-                      <div className="p-3 rounded-[6px] bg-[var(--bg-secondary)] border border-[var(--border-default)] space-y-1.5 max-h-48 overflow-y-auto">
+                  {/* Selected Items Breakdown */}
+                  {selectedItemsSummary.items.length > 0 && (
+                    <div className="pb-3 border-b border-neutral-200">
+                      <span className="text-[11px] font-semibold text-neutral-600 uppercase tracking-wider block mb-1">
+                        Selected Fee Heads
+                      </span>
+                      <div className="divide-y divide-neutral-100 max-h-36 overflow-y-auto">
                         {selectedItemsSummary.items.map((item) => (
-                          <div key={item.charge.id} className="flex items-center justify-between text-xs">
+                          <div
+                            key={item.charge.id}
+                            className="py-1.5 flex items-center justify-between text-xs"
+                          >
                             <div className="truncate mr-2">
-                              <span className="font-semibold text-neutral-800">
+                              <span className="font-medium text-neutral-800">
                                 {item.charge.title}
                               </span>
                               {item.newDue > 0 && (
-                                <span className="text-[10px] text-amber-600 ml-1">
-                                  (Partial, Due: {item.newDue})
+                                <span className="text-[10px] text-neutral-500 ml-1.5">
+                                  (Due: NPR {item.newDue.toLocaleString()})
                                 </span>
                               )}
                             </div>
-                            <span className="font-bold text-neutral-900 shrink-0">
-                              NPR {item.payingNow.toLocaleString()}
+                            <span className="font-semibold text-neutral-900 shrink-0 font-mono">
+                              NPR {item.payingNow.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Total to Collect Highlight Banner */}
-                  <div className="p-3.5 rounded-[6px] bg-neutral-900 text-white flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 block">
-                        Amount to Collect
-                      </span>
-                      <span className="text-lg font-bold text-white">
-                        NPR {selectedItemsSummary.totalToCollect.toLocaleString()}
+                  {/* Billing Ledger */}
+                  <div className="space-y-2.5 text-xs">
+                    {/* Subtotal */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-600 font-medium">Subtotal</span>
+                      <span className="font-semibold text-neutral-900 font-mono">
+                        NPR {billingCalculations.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
-                    <Receipt className="h-6 w-6 text-neutral-400" />
-                  </div>
 
-                  {/* Payment Method Selector */}
-                  <div className="space-y-1.5">
-                    <label className="font-bold uppercase tracking-wider text-[11px] text-[var(--text-secondary)] block">
-                      Payment Method
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(["Cash", "Bank", "Card", "Online"] as PaymentMethod[]).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setPaymentMethod(mode)}
-                          className={cn(
-                            "py-2 px-3 rounded-[6px] border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
-                            paymentMethod === mode
-                              ? "bg-[var(--brand-primary)] text-white border-[var(--brand-primary)] shadow-xs"
-                              : "bg-white border-[var(--border-default)] text-neutral-700 hover:bg-neutral-50"
-                          )}
-                        >
-                          {mode === "Cash" && <DollarSign className="h-3.5 w-3.5" />}
-                          {mode === "Bank" && <Building className="h-3.5 w-3.5" />}
-                          {mode === "Card" && <CreditCard className="h-3.5 w-3.5" />}
-                          {mode === "Online" && <Coins className="h-3.5 w-3.5" />}
-                          <span>{mode}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Bank Transfer Reference Details */}
-                  {paymentMethod === "Bank" && (
-                    <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-[6px] space-y-2 animate-in fade-in-0 duration-150">
-                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[11px] uppercase tracking-wider">
-                        <Building className="h-3.5 w-3.5" />
-                        <span>Bank Transfer / Statement Details</span>
+                    {/* Discount */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-600 font-medium shrink-0">Discount</span>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <div className="flex rounded border border-neutral-300 bg-white overflow-hidden shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("fixed")}
+                            className={cn(
+                              "px-1.5 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer",
+                              discountType === "fixed"
+                                ? "bg-neutral-800 text-white"
+                                : "text-neutral-600 hover:bg-neutral-100"
+                            )}
+                          >
+                            NPR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDiscountType("percent")}
+                            className={cn(
+                              "px-1.5 py-0.5 text-[10px] font-semibold transition-colors cursor-pointer",
+                              discountType === "percent"
+                                ? "bg-neutral-800 text-white"
+                                : "text-neutral-600 hover:bg-neutral-100"
+                            )}
+                          >
+                            %
+                          </button>
+                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          value={discountValue}
+                          onChange={(e) => setDiscountValue(e.target.value)}
+                          placeholder="0"
+                          className="w-16 h-7 px-2 text-right rounded border border-neutral-300 bg-white text-xs text-neutral-900 focus:outline-none focus:border-neutral-800"
+                        />
+                        <span className="text-neutral-600 font-mono w-24 text-right">
+                          - NPR {billingCalculations.discount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
                       </div>
+                    </div>
+
+                    {/* Tax / Cess */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-600 font-medium shrink-0">Tax / Cess</span>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <select
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
+                          className="h-7 px-2 rounded border border-neutral-300 bg-white text-xs text-neutral-800 focus:outline-none focus:border-neutral-800"
+                        >
+                          <option value={0}>0% Tax Exempt</option>
+                          <option value={1}>1% Education Cess</option>
+                          <option value={5}>5% Service Tax</option>
+                          <option value={13}>13% VAT</option>
+                        </select>
+                        <span className="text-neutral-600 font-mono w-24 text-right">
+                          + NPR {billingCalculations.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Fine */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-neutral-600 font-medium shrink-0">Late Fine</span>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <input
+                          type="number"
+                          min={0}
+                          value={fineAmount}
+                          onChange={(e) => setFineAmount(e.target.value)}
+                          placeholder="0"
+                          className="w-20 h-7 px-2 text-right rounded border border-neutral-300 bg-white text-xs text-neutral-900 focus:outline-none focus:border-neutral-800"
+                        />
+                        <span className="text-neutral-600 font-mono w-24 text-right">
+                          + NPR {billingCalculations.fine.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Net Total Row - Simple, Clean, Unboxed */}
+                  <div className="pt-3 border-t-2 border-neutral-900 flex items-baseline justify-between">
+                    <div>
+                      <span className="text-xs font-bold uppercase tracking-wider text-neutral-800 block">
+                        Net Total Amount
+                      </span>
+                      <span className="text-[11px] text-neutral-500">Total to Collect</span>
+                    </div>
+                    <div className="text-xl sm:text-2xl font-bold font-mono text-neutral-900">
+                      NPR {billingCalculations.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+
+                  {/* Payment Mode & Details */}
+                  <div className="space-y-3 pt-3 border-t border-neutral-200">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-neutral-700 block">
+                        Payment Mode <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                        className="w-full h-8 px-2.5 rounded border border-neutral-300 bg-white text-xs font-medium text-neutral-800 focus:outline-none focus:border-neutral-800"
+                      >
+                        <option value="Cash">Cash</option>
+                        <option value="Bank">Bank Transfer / Deposit</option>
+                        <option value="Card">Credit / Debit Card (POS)</option>
+                        <option value="Online">Online / Digital (eSewa / Khalti / QR)</option>
+                      </select>
+                    </div>
+
+                    {/* Cash Tendered & Change Due */}
+                    {paymentMethod === "Cash" && billingCalculations.grandTotal > 0 && (
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-neutral-600 block">
+                            Cash Received
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={amountReceived}
+                            onChange={(e) => setAmountReceived(e.target.value)}
+                            placeholder={billingCalculations.grandTotal.toString()}
+                            className="w-full h-7.5 px-2.5 text-right rounded border border-neutral-300 bg-white text-xs font-semibold text-neutral-900 focus:outline-none focus:border-neutral-800"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-medium text-neutral-600 block">
+                            Change Due
+                          </span>
+                          <div className="h-7.5 flex items-center justify-end px-2.5 rounded bg-neutral-100 font-semibold text-xs text-neutral-900 border border-neutral-200">
+                            NPR {billingCalculations.changeDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bank Reference */}
+                    {paymentMethod === "Bank" && (
                       <div className="space-y-1">
-                        <label className="font-semibold text-emerald-900 text-[11px]">
-                          Bank Reference Number / Voucher No. <span className="text-red-500">*</span>
+                        <label className="text-[11px] font-medium text-neutral-700 block">
+                          Bank Reference / Voucher No. <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -939,25 +1123,16 @@ export default function FeeCollectionPage() {
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           placeholder="e.g. NBL123456 or Voucher #84920"
-                          className="w-full h-8 px-2.5 rounded-[6px] border border-emerald-300 bg-white text-xs font-mono text-emerald-950 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-500"
+                          className="w-full h-8 px-2.5 rounded border border-neutral-300 bg-white text-xs text-neutral-900 focus:outline-none focus:border-neutral-800 font-mono"
                           autoFocus
                         />
                       </div>
-                      <p className="text-[10px] text-emerald-700">
-                        Enter bank statement reference or deposit voucher number presented by student.
-                      </p>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Online Gateway Reference Details */}
-                  {paymentMethod === "Online" && (
-                    <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-[6px] space-y-2 animate-in fade-in-0 duration-150">
-                      <div className="flex items-center gap-1.5 text-blue-800 font-bold text-[11px] uppercase tracking-wider">
-                        <Coins className="h-3.5 w-3.5" />
-                        <span>Digital Gateway Transaction Ref</span>
-                      </div>
+                    {/* Online Gateway */}
+                    {paymentMethod === "Online" && (
                       <div className="space-y-1">
-                        <label className="font-semibold text-blue-900 text-[11px]">
+                        <label className="text-[11px] font-medium text-neutral-700 block">
                           Transaction ID / eSewa / Khalti Ref <span className="text-red-500">*</span>
                         </label>
                         <input
@@ -966,23 +1141,17 @@ export default function FeeCollectionPage() {
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           placeholder="e.g. ESW-849204 or KHLTI-19283"
-                          className="w-full h-8 px-2.5 rounded-[6px] border border-blue-300 bg-white text-xs font-mono text-blue-950 focus:outline-none focus:border-blue-600"
+                          className="w-full h-8 px-2.5 rounded border border-neutral-300 bg-white text-xs text-neutral-900 focus:outline-none focus:border-neutral-800 font-mono"
                           autoFocus
                         />
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Card / POS Reference Details */}
-                  {paymentMethod === "Card" && (
-                    <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-[6px] space-y-2 animate-in fade-in-0 duration-150">
-                      <div className="flex items-center gap-1.5 text-purple-800 font-bold text-[11px] uppercase tracking-wider">
-                        <CreditCard className="h-3.5 w-3.5" />
-                        <span>POS Card Transaction Code</span>
-                      </div>
+                    {/* Card Auth */}
+                    {paymentMethod === "Card" && (
                       <div className="space-y-1">
-                        <label className="font-semibold text-purple-900 text-[11px]">
-                          Approval Code / Card Slip Auth No. <span className="text-red-500">*</span>
+                        <label className="text-[11px] font-medium text-neutral-700 block">
+                          Approval Code / Slip Auth No. <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
@@ -990,52 +1159,75 @@ export default function FeeCollectionPage() {
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           placeholder="e.g. AUTH-092841"
-                          className="w-full h-8 px-2.5 rounded-[6px] border border-purple-300 bg-white text-xs font-mono text-purple-950 focus:outline-none focus:border-purple-600"
+                          className="w-full h-8 px-2.5 rounded border border-neutral-300 bg-white text-xs text-neutral-900 focus:outline-none focus:border-neutral-800 font-mono"
                           autoFocus
                         />
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Remarks Input */}
-                  <div className="space-y-1">
-                    <label className="font-medium text-[var(--text-secondary)]">
-                      Cashier Remarks / Receipt Notes
-                    </label>
-                    <input
-                      type="text"
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="e.g. Term fee payment received at counter"
-                      className="w-full h-8 px-2.5 rounded-[6px] border border-[var(--border-default)] text-xs"
-                    />
+                    {/* Remarks */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-medium text-neutral-600 block">
+                        Cashier Remarks / Notes
+                      </label>
+                      <input
+                        type="text"
+                        value={remarks}
+                        onChange={(e) => setRemarks(e.target.value)}
+                        placeholder="e.g. Term fee payment received at counter"
+                        className="w-full h-8 px-2.5 rounded border border-neutral-300 bg-white text-xs text-neutral-800 focus:outline-none focus:border-neutral-800"
+                      />
+                    </div>
                   </div>
 
-                  {/* Action Buttons */}
+                  {/* Action Buttons & Print Options */}
                   <div className="pt-2 space-y-2">
                     <button
                       type="submit"
-                      disabled={selectedItemsSummary.totalToCollect <= 0}
+                      disabled={billingCalculations.grandTotal <= 0}
                       className={cn(
-                        "w-full py-2.5 rounded-[6px] text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-all",
-                        selectedItemsSummary.totalToCollect > 0
+                        "w-full py-2.5 rounded-[6px] text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-xs",
+                        billingCalculations.grandTotal > 0
                           ? "bg-[var(--brand-primary)] text-white hover:bg-[var(--brand-primary-hover)] cursor-pointer"
                           : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                       )}
                     >
                       <Receipt className="h-4 w-4" />
-                      <span>
-                        Collect NPR {selectedItemsSummary.totalToCollect.toLocaleString()}
-                      </span>
+                      <span>Pay Now</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setSelectedStudentId(null)}
-                      className="w-full py-2 rounded-[6px] border border-[var(--border-default)] hover:bg-neutral-50 text-neutral-600 text-xs font-medium transition-colors"
+                      className="w-full py-2 rounded-[6px] border border-neutral-300 hover:bg-neutral-50 text-neutral-600 text-xs font-medium transition-colors cursor-pointer"
                     >
                       Cancel &amp; Return
                     </button>
+
+                    {/* Print Preference Options */}
+                    <div className="flex items-center justify-center gap-6 pt-1 text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-neutral-700">
+                        <input
+                          type="radio"
+                          name="billPrintPreference"
+                          checked={printBill === true}
+                          onChange={() => setPrintBill(true)}
+                          className="h-3.5 w-3.5 text-neutral-900 border-neutral-300 focus:ring-0 cursor-pointer"
+                        />
+                        <span>Print Bill</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none text-neutral-700">
+                        <input
+                          type="radio"
+                          name="billPrintPreference"
+                          checked={printBill === false}
+                          onChange={() => setPrintBill(false)}
+                          className="h-3.5 w-3.5 text-neutral-900 border-neutral-300 focus:ring-0 cursor-pointer"
+                        />
+                        <span>No Bill Print</span>
+                      </label>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -1262,13 +1454,62 @@ export default function FeeCollectionPage() {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t-2 border-neutral-900 font-bold text-xs bg-neutral-50">
+                    {completedReceipt.subtotalAmount !== undefined && (
+                      <tr className="border-t border-neutral-300 text-xs bg-neutral-50/50">
+                        <td colSpan={3} className="py-1.5 px-3 text-neutral-600">Subtotal:</td>
+                        <td className="py-1.5 px-3 text-right font-medium text-neutral-900">
+                          NPR {completedReceipt.subtotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-1.5 px-3" />
+                      </tr>
+                    )}
+                    {completedReceipt.discountAmount !== undefined && completedReceipt.discountAmount > 0 && (
+                      <tr className="text-xs bg-neutral-50/50 text-emerald-700">
+                        <td colSpan={3} className="py-1.5 px-3">Discount / Concession:</td>
+                        <td className="py-1.5 px-3 text-right font-medium">
+                          - NPR {completedReceipt.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-1.5 px-3" />
+                      </tr>
+                    )}
+                    {completedReceipt.taxAmount !== undefined && completedReceipt.taxAmount > 0 && (
+                      <tr className="text-xs bg-neutral-50/50 text-neutral-700">
+                        <td colSpan={3} className="py-1.5 px-3">Tax / Education Cess ({completedReceipt.taxRate || 0}%):</td>
+                        <td className="py-1.5 px-3 text-right font-medium">
+                          + NPR {completedReceipt.taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-1.5 px-3" />
+                      </tr>
+                    )}
+                    {completedReceipt.fineAmount !== undefined && completedReceipt.fineAmount > 0 && (
+                      <tr className="text-xs bg-neutral-50/50 text-rose-700">
+                        <td colSpan={3} className="py-1.5 px-3">Late Fine / Penalty:</td>
+                        <td className="py-1.5 px-3 text-right font-medium">
+                          + NPR {completedReceipt.fineAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-1.5 px-3" />
+                      </tr>
+                    )}
+                    <tr className="border-t-2 border-neutral-900 font-bold text-xs bg-neutral-100">
                       <td colSpan={3} className="py-2.5 px-3 uppercase">Total Amount Collected:</td>
                       <td className="py-2.5 px-3 text-right text-sm text-[var(--brand-primary)]">
-                        NPR {completedReceipt.totalAmount.toLocaleString()}
+                        NPR {completedReceipt.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td className="py-2.5 px-3" />
                     </tr>
+                    {completedReceipt.amountReceived !== undefined && (
+                      <tr className="text-[11px] text-neutral-600 bg-neutral-50/70 border-t border-neutral-200">
+                        <td colSpan={3} className="py-1.5 px-3">
+                          Tendered: NPR {completedReceipt.amountReceived.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {completedReceipt.changeAmount !== undefined && completedReceipt.changeAmount > 0 && (
+                            <span className="ml-3 font-semibold text-neutral-800">
+                              Change Returned: NPR {completedReceipt.changeAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          )}
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
 

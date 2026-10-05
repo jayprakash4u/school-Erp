@@ -96,6 +96,7 @@ export const erpModules: NavItem[] = [
     id: "dashboard",
     order: 1,
     title: "Dashboard",
+    shortTitle: "Dashboard",
     href: ROUTES.DASHBOARD,
     icon: LayoutDashboard,
     categories: [],
@@ -106,6 +107,7 @@ export const erpModules: NavItem[] = [
     id: "students",
     order: 2,
     title: "Students",
+    shortTitle: "Students",
     href: ROUTES.STUDENTS.ROOT,
     icon: GraduationCap,
     categories: [
@@ -130,6 +132,7 @@ export const erpModules: NavItem[] = [
     id: "academics",
     order: 3,
     title: "Academics",
+    shortTitle: "Academics",
     href: ROUTES.ACADEMICS.ROOT,
     icon: BookOpen,
     categories: [
@@ -159,6 +162,7 @@ export const erpModules: NavItem[] = [
     id: "examinations",
     order: 4,
     title: "Examinations",
+    shortTitle: "Examinations",
     href: ROUTES.EXAMS.ROOT,
     icon: FileSpreadsheet,
     categories: [
@@ -188,6 +192,7 @@ export const erpModules: NavItem[] = [
     id: "attendance",
     order: 5,
     title: "Attendance",
+    shortTitle: "Attendance",
     href: "/attendance",
     icon: CalendarCheck,
     categories: [
@@ -217,6 +222,7 @@ export const erpModules: NavItem[] = [
     id: "fees",
     order: 6,
     title: "Fees & Finance",
+    shortTitle: "Fees & Finance",
     href: ROUTES.FEES.ROOT,
     icon: Coins,
     categories: [
@@ -226,33 +232,43 @@ export const erpModules: NavItem[] = [
           { title: "Fee Collection", href: ROUTES.FEES.COLLECTION, icon: Receipt },
           { title: "Fee Dues & Inquiry", href: ROUTES.FEES.DUE_LIST, icon: AlertCircle },
           { title: "Invoices & Receipts", href: ROUTES.FEES.INVOICES, icon: FileText },
-          { title: "Fee Structures", href: ROUTES.FEES.STRUCTURE, icon: Sliders },
-          { title: "Student Ledger", href: ROUTES.FEES.LEDGER, icon: Grid },
           { title: "Payment History", href: ROUTES.FEES.HISTORY, icon: History },
           { title: "Online Payments", href: ROUTES.FEES.ONLINE_PAYMENT, icon: CreditCard },
           { title: "Refunds & Adjustments", href: ROUTES.FEES.REFUNDS, icon: RotateCcw },
           { title: "Scholarships & Concessions", href: ROUTES.FEES.SETUP.SCHOLARSHIPS, icon: Percent },
+          { title: "Counter Closing", href: ROUTES.FEES.COUNTER_CLOSING, icon: CheckSquare },
         ],
       },
       {
-        title: "Fee Setup",
+        title: "Fee Configuration",
         items: [
-          { title: "Program Total Fee", href: ROUTES.FEES.SETUP.PROGRAM_TOTAL, icon: Layers },
-          { title: "Program Annual Fee", href: ROUTES.FEES.SETUP.PROGRAM_ANNUAL, icon: Calendar },
-          { title: "Program Semester Fee", href: ROUTES.FEES.SETUP.PROGRAM_SEMESTER, icon: Clock },
-          { title: "Class Annual Fee", href: ROUTES.FEES.SETUP.CLASS_ANNUAL, icon: Building },
-          { title: "Class Monthly Fee", href: ROUTES.FEES.SETUP.CLASS_MONTHLY, icon: CalendarCheck },
+          { title: "Fee Structures", href: ROUTES.FEES.STRUCTURE, icon: Sliders },
+          { title: "Program Fee Setup", href: ROUTES.FEES.SETUP.PROGRAM_FEE, icon: Layers },
+          { title: "Class Fee Setup", href: ROUTES.FEES.SETUP.CLASS_FEE, icon: Building },
           { title: "Student Custom Fee", href: ROUTES.FEES.SETUP.STUDENT_CUSTOM, icon: UserCheck },
-          { title: "Student Fee Schedule", href: ROUTES.FEES.SETUP.STUDENT_SCHEDULE, icon: Sliders },
+          { title: "Student Fee Schedule", href: ROUTES.FEES.SETUP.STUDENT_SCHEDULE, icon: Calendar },
+          { title: "Miscellaneous Fees", href: ROUTES.FEES.SETUP.ASSIGN_MISC, icon: Tag },
+          { title: "Installment Plans", href: ROUTES.FEES.SETUP.INSTALLMENTS, icon: CalendarCheck },
+          { title: "Fine & Late Fee Rules", href: ROUTES.FEES.SETUP.FINES, icon: AlertTriangle },
+        ],
+      },
+      {
+        title: "Accounts & Finance",
+        items: [
+          { title: "Chart of Accounts", href: ROUTES.FEES.ACCOUNTS.CHART_OF_ACCOUNTS, icon: Grid },
+          { title: "General Ledger", href: ROUTES.FEES.ACCOUNTS.GENERAL_LEDGER, icon: BookOpen },
+          { title: "Party Ledgers", href: ROUTES.FEES.ACCOUNTS.PARTY_LEDGERS, icon: Users },
+          { title: "Journal Entries", href: ROUTES.FEES.ACCOUNTS.JOURNAL_ENTRIES, icon: FileSignature },
+          { title: "Cash & Bank Books", href: ROUTES.FEES.ACCOUNTS.CASH_BANK_BOOKS, icon: Building2 },
+          { title: "Expense Management", href: ROUTES.FEES.ACCOUNTS.EXPENSES, icon: DollarSign },
+          { title: "Financial Reports", href: ROUTES.FEES.REPORTS, icon: BarChart2 },
         ],
         secondaryTitle: "Other Setup",
         secondaryItems: [
           { title: "Invoice & Receipt Setup", href: ROUTES.FEES.SETUP.INVOICE_SETUP, icon: FileText },
           { title: "Invoice Template Designer", href: ROUTES.FEES.SETUP.INVOICE_TEMPLATE, icon: Sparkles },
-          { title: "Miscellaneous Fees", href: ROUTES.FEES.SETUP.ASSIGN_MISC, icon: Tag },
-          { title: "Installment Plans", href: ROUTES.FEES.SETUP.INSTALLMENTS, icon: Calendar },
-          { title: "Fine & Late Fee Rules", href: ROUTES.FEES.SETUP.FINES, icon: AlertTriangle },
           { title: "Payment & Bank Settings", href: ROUTES.FEES.SETUP.SETTINGS, icon: Settings },
+          { title: "Accounting Settings", href: ROUTES.FEES.ACCOUNTS.SETTINGS, icon: Settings },
         ],
       },
     ],
@@ -263,6 +279,7 @@ export const erpModules: NavItem[] = [
     id: "staff",
     order: 7,
     title: "HR & Staff",
+    shortTitle: "HR & Staff",
     href: ROUTES.STAFF.ROOT,
     icon: Briefcase,
     categories: [
@@ -292,6 +309,7 @@ export const erpModules: NavItem[] = [
     id: "library",
     order: 8,
     title: "Library",
+    shortTitle: "Library",
     href: "/library",
     icon: Library,
     categories: [
@@ -321,6 +339,7 @@ export const erpModules: NavItem[] = [
     id: "transport",
     order: 9,
     title: "Transport",
+    shortTitle: "Transport",
     href: "/transport",
     icon: Bus,
     categories: [
@@ -350,6 +369,7 @@ export const erpModules: NavItem[] = [
     id: "hostel",
     order: 10,
     title: "Hostel",
+    shortTitle: "Hostel",
     href: "/hostel",
     icon: Bed,
     categories: [
@@ -379,6 +399,7 @@ export const erpModules: NavItem[] = [
     id: "communication",
     order: 11,
     title: "Communication",
+    shortTitle: "Communication",
     href: "/communication",
     icon: MessageSquare,
     categories: [
@@ -408,6 +429,7 @@ export const erpModules: NavItem[] = [
     id: "settings",
     order: 12,
     title: "Settings",
+    shortTitle: "Settings",
     href: ROUTES.SETTINGS.ROOT,
     icon: Settings,
     categories: [
@@ -437,6 +459,7 @@ export const erpModules: NavItem[] = [
     id: "reports",
     order: 13,
     title: "Reports",
+    shortTitle: "Reports",
     href: ROUTES.REPORTS.ROOT,
     icon: FileText,
     categories: [
@@ -466,6 +489,7 @@ export const erpModules: NavItem[] = [
     id: "analytics",
     order: 14,
     title: "Analytics",
+    shortTitle: "Analytics",
     href: "/analytics",
     icon: LineChart,
     categories: [
@@ -495,6 +519,7 @@ export const erpModules: NavItem[] = [
     id: "inventory",
     order: 15,
     title: "Inventory",
+    shortTitle: "Inventory",
     href: "/inventory",
     icon: Package,
     categories: [
@@ -524,6 +549,7 @@ export const erpModules: NavItem[] = [
     id: "documents",
     order: 16,
     title: "Documents",
+    shortTitle: "Documents",
     href: "/documents",
     icon: Folder,
     categories: [
@@ -553,6 +579,7 @@ export const erpModules: NavItem[] = [
     id: "lab",
     order: 17,
     title: "Examination Lab",
+    shortTitle: "Exam Lab",
     href: "/lab",
     icon: FlaskConical,
     categories: [
@@ -582,6 +609,7 @@ export const erpModules: NavItem[] = [
     id: "behaviour",
     order: 18,
     title: "Behaviour",
+    shortTitle: "Behaviour",
     href: "/behaviour",
     icon: ShieldCheck,
     categories: [
@@ -611,6 +639,7 @@ export const erpModules: NavItem[] = [
     id: "master-setup",
     order: 19,
     title: "Master Setup",
+    shortTitle: "Master Setup",
     href: "/master-setup",
     icon: Sliders,
     categories: [
@@ -629,13 +658,12 @@ export const erpModules: NavItem[] = [
     ],
   },
 
-
-
   // 20. Help & Support
   {
     id: "support",
     order: 20,
     title: "Help & Support",
+    shortTitle: "Help & Support",
     href: "/support",
     icon: Headphones,
     categories: [
