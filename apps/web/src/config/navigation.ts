@@ -15,6 +15,7 @@ import {
   LineChart,
   Package,
   Folder,
+  FolderTree,
   FlaskConical,
   ShieldCheck,
   Link2,
@@ -284,21 +285,15 @@ export const erpModules: NavItem[] = [
     icon: Briefcase,
     categories: [
       {
-        title: "Staff Management",
+        title: "HR Functions",
         items: [
-          { title: "Staff Directory", href: ROUTES.STAFF.ROOT, icon: Users },
-          { title: "Add New Employee", href: "/staff/new", icon: UserPlus },
-          { title: "Departments & Designations", href: "/staff/departments", icon: Building2 },
-          { title: "Teacher Profiles", href: ROUTES.TEACHERS.ROOT, icon: GraduationCap },
-        ],
-      },
-      {
-        title: "Payroll & Operations",
-        items: [
-          { title: "Payroll & Salary Slips", href: ROUTES.STAFF.PAYROLL, icon: DollarSign },
-          { title: "Staff Leave Applications", href: ROUTES.STAFF.LEAVE, icon: Calendar },
-          { title: "Staff Attendance Log", href: ROUTES.STAFF.ATTENDANCE, icon: CheckSquare },
-          { title: "Staff Appraisal / Reviews", href: "/staff/reviews", icon: Award },
+          { title: "Employees", href: "/staff", icon: Users },
+          { title: "Add New Employee", href: "/staff/add", icon: UserPlus },
+          { title: "Staff Assignments", href: "/staff/assignments", icon: UserCheck },
+          { title: "Staff Attendance", href: "/staff/attendance", icon: CheckSquare },
+          { title: "Leave Management", href: "/staff/leaves", icon: Calendar },
+          { title: "Payroll", href: "/staff/payroll", icon: DollarSign },
+          { title: "Reports", href: "/staff/reports", icon: BarChart2 },
         ],
       },
     ],
@@ -644,15 +639,37 @@ export const erpModules: NavItem[] = [
     icon: Sliders,
     categories: [
       {
-        title: "Setup",
+        title: "Academic Setup",
         items: [
-          { title: "General Setup", href: "/master-setup/general", icon: Settings },
-          { title: "Class Setup", href: "/master-setup/classes", icon: GraduationCap },
-          { title: "Location", href: "/master-setup/locations", icon: MapPin },
-          { title: "Batch", href: "/master-setup/batches", icon: Calendar },
-          { title: "Subject", href: "/master-setup/subjects", icon: FileText },
-          { title: "Subject Mapping", href: "/master-setup/subject-mapping", icon: Layers },
+          { title: "Academic Years", href: "/master-setup/batches", icon: Calendar },
+          { title: "Departments", href: "/master-setup/departments", icon: Building2 },
+          { title: "Programs", href: "/master-setup/programs", icon: BookOpen },
+          { title: "Classes / Grades", href: "/master-setup/classes", icon: GraduationCap },
+          { title: "Academic Levels", href: "/master-setup/academic-levels", icon: Layers },
+          { title: "Sections", href: "/master-setup/sections", icon: Users },
+          { title: "Subjects", href: "/master-setup/subjects", icon: FileText },
+        ],
+      },
+      {
+        title: "HR Setup",
+        items: [
+          { title: "Employee Types", href: "/master-setup/employee-types", icon: Users },
+          { title: "Designations", href: "/master-setup/designations", icon: Award },
+        ],
+      },
+      {
+        title: "General Setup",
+        items: [
+          { title: "Locations", href: "/master-setup/locations", icon: MapPin },
+          { title: "Common Types", href: "/master-setup/general?tab=gender", icon: Tag },
+          { title: "Other General Masters", href: "/master-setup/general", icon: Settings },
+        ],
+      },
+      {
+        title: "System Setup",
+        items: [
           { title: "Document Numbering", href: "/master-setup/document-numbering", icon: Tag },
+          { title: "System Configuration", href: "/settings/general", icon: Sliders },
         ],
       },
     ],

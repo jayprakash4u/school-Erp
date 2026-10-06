@@ -121,9 +121,14 @@ export default function StudentRegistrationPage() {
     passportNo: "",
     nationalIdNo: "",
 
-    // Academic
+    // Academic Registration
+    academicYear: "2026–27",
+    department: "Computer Science & Engineering",
+    program: "B.Tech CSE",
     class: "Grade 10",
+    academicLevel: "Semester 1",
     section: "Section A",
+    admissionDate: "2026-10-06",
     rollNumber: "105",
     batch: "2083/84",
     previousSchoolName: "Saraswati Secondary School",
@@ -548,10 +553,10 @@ export default function StudentRegistrationPage() {
               <div className="bg-white rounded-[6px] border border-[var(--border-default)] shadow-xs p-5 space-y-4">
                 <div className="border-b border-[var(--border-default)] pb-3">
                   <h2 className="text-sm font-bold text-[var(--text-primary)]">
-                    Academic Details
+                    Academic Registration
                   </h2>
                   <p className="text-xs text-[var(--neutral-500)]">
-                    Class admission, batch section, and prior schooling history
+                    Academic year, department, program, class/grade, level, section, and admission date
                   </p>
                 </div>
 

@@ -286,8 +286,16 @@ export default function GeneralSetupPage() {
     return SETUP_TABS.find((t) => t.id === activeTabId) || SETUP_TABS[0];
   }, [activeTabId]);
 
-  // Load state from localStorage on mount
+  // Load state from localStorage on mount & check URL tab query
   React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && SETUP_TABS.some((t) => t.id === tabParam)) {
+        setActiveTabId(tabParam);
+      }
+    }
+
     const saved = localStorage.getItem("erp_master_general_options_v5");
     if (saved) {
       try {
