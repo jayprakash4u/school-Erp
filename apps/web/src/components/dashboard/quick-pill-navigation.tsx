@@ -27,7 +27,7 @@ interface QuickPill {
 const QUICK_PILLS: QuickPill[] = [
   { title: "Collect Fee", href: "/fees/collection", className: "bg-[var(--brand-primary)] hover:bg-red-700 text-white", icon: Coins },
   { title: "New Admission", href: "/students/admission", className: "bg-[var(--brand-secondary)] hover:bg-black text-white", icon: UserPlus },
-  { title: "Upgrade Class", href: "/students/upgrade-class", className: "bg-[var(--red-50)] text-[var(--brand-primary)] border border-[var(--red-200)] hover:bg-[var(--red-100)]", icon: ArrowRight },
+  { title: "Student Promotion", href: "/students/upgrade-class", className: "bg-[var(--red-50)] text-[var(--brand-primary)] border border-[var(--red-200)] hover:bg-[var(--red-100)]", icon: ArrowRight },
   { title: "Change Section", href: "/students/change-section", className: "bg-white text-[var(--neutral-800)] border border-[var(--border-default)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]", icon: ArrowLeftRight },
   { title: "Attendance", href: "/attendance", icon: CalendarCheck, className: "bg-white text-[var(--neutral-800)] border border-[var(--border-default)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]" },
   { title: "Exam Schedule", href: "/examinations/schedule", className: "bg-white text-[var(--neutral-800)] border border-[var(--border-default)] hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)]" },

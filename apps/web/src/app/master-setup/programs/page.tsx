@@ -254,7 +254,7 @@ export default function ProgramsSetupPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)]">
       <ErpHeader />
-      <ErpTopNav activeModuleId="master-setup" />
+      <ErpTopNav activeModuleId="academics" />
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
         {/* Breadcrumb */}

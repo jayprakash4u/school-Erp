@@ -58,6 +58,7 @@ import {
   MapPin,
   QrCode,
   Sparkles,
+  PlusCircle,
   Smartphone,
   Mail,
   Share2,
@@ -117,7 +118,7 @@ export const erpModules: NavItem[] = [
         items: [
           { title: "Our Students", href: ROUTES.STUDENTS.ROOT, icon: Users },
           { title: "Student Registration", href: ROUTES.STUDENTS.ADMISSION, icon: UserPlus },
-          { title: "Upgrade Class", href: "/students/upgrade-class", icon: ArrowRight },
+          { title: "Student Promotion", href: ROUTES.STUDENTS.PROMOTION, icon: ArrowRight },
           { title: "Change Section", href: "/students/change-section", icon: ArrowLeftRight },
           { title: "Disable Students", href: ROUTES.STUDENTS.DISABLE, icon: UserX },
           { title: "Disabled Students", href: ROUTES.STUDENTS.DISABLED, icon: Users },
@@ -134,15 +135,27 @@ export const erpModules: NavItem[] = [
     order: 3,
     title: "Academics",
     shortTitle: "Academics",
-    href: ROUTES.ACADEMICS.ROOT,
+    href: "/master-setup/classes",
     icon: BookOpen,
     categories: [
       {
+        title: "Academic Setup",
+        items: [
+          { title: "Academic Years", href: "/master-setup/batches", icon: Calendar },
+          { title: "Departments", href: "/master-setup/departments", icon: Building2 },
+          { title: "Programs", href: "/master-setup/programs", icon: BookOpen },
+          { title: "Classes / Grades", href: "/master-setup/classes", icon: GraduationCap },
+          { title: "Academic Levels", href: "/master-setup/academic-levels", icon: Layers },
+          { title: "Sections", href: "/master-setup/sections", icon: Users },
+          { title: "Subjects", href: "/master-setup/subjects", icon: FileText },
+        ],
+      },
+      {
         title: "Classes & Curriculum",
         items: [
-          { title: "Classes & Sections", href: ROUTES.ACADEMICS.CLASSES, icon: Building },
-          { title: "Subjects & Syllabus", href: ROUTES.ACADEMICS.SUBJECTS, icon: BookOpen },
-          { title: "Class Timetable", href: ROUTES.ACADEMICS.TIMETABLE, icon: Clock },
+          { title: "Classes & Sections", href: "/master-setup/classes", icon: Building },
+          { title: "Subjects & Syllabus", href: "/master-setup/subjects", icon: BookOpen },
+          { title: "Class Timetable", href: "/academics/timetable", icon: Clock },
           { title: "Academic Calendar", href: "/academics/calendar", icon: Calendar },
         ],
       },
@@ -309,21 +322,50 @@ export const erpModules: NavItem[] = [
     icon: Library,
     categories: [
       {
-        title: "Book Inventory & Circulation",
+        title: "Library Setup",
         items: [
-          { title: "Book Directory", href: "/library/books", icon: BookMarked },
-          { title: "Issue / Return Book", href: "/library/issue-return", icon: RefreshCw },
-          { title: "Member Registry", href: "/library/members", icon: Users },
-          { title: "Overdue & Fine Collection", href: "/library/fines", icon: AlertCircle },
+          { title: "Dashboard", href: "/library?tab=dashboard", icon: LayoutDashboard },
+          { title: "Libraries", href: "/library/setup?area=library", icon: Building2 },
+          { title: "Membership Types", href: "/library/setup?area=member-types", icon: UserCheck },
+          { title: "Library Rules", href: "/library/setup?area=rules", icon: Settings },
+          { title: "Fine Rules", href: "/library/setup?area=fines", icon: Coins },
+        ],
+        secondaryTitle: "Members",
+        secondaryItems: [
+          { title: "Register Member", href: "/library?tab=members&sub=register", icon: UserPlus },
+          { title: "Members", href: "/library?tab=members&sub=list", icon: Users },
+          { title: "Membership History", href: "/library?tab=members&sub=history", icon: History },
         ],
       },
       {
-        title: "Digital Library",
+        title: "Books",
         items: [
-          { title: "Barcode / RFID Labels", href: "/library/barcodes", icon: QrCode },
-          { title: "Digital E-Books", href: "/library/ebooks", icon: BookOpen },
-          { title: "Publisher & Authors", href: "/library/publishers", icon: List },
-          { title: "Library Reports", href: "/library/reports", icon: FileText },
+          { title: "Book Entry", href: "/library?tab=books&sub=entry", icon: PlusCircle },
+          { title: "Books", href: "/library?tab=books&sub=list", icon: BookMarked },
+          { title: "Categories", href: "/library?tab=books&sub=categories", icon: List },
+          { title: "Authors", href: "/library?tab=books&sub=authors", icon: Users },
+          { title: "Publishers", href: "/library?tab=books&sub=publishers", icon: Building },
+          { title: "Locations", href: "/library?tab=books&sub=locations", icon: Grid },
+        ],
+      },
+      {
+        title: "Circulation",
+        items: [
+          { title: "Issue Book", href: "/library?tab=circulation&sub=issue", icon: Upload },
+          { title: "Return Book", href: "/library?tab=circulation&sub=return", icon: RefreshCw },
+          { title: "Renew Book", href: "/library?tab=circulation&sub=renew", icon: RotateCcw },
+          { title: "Reservations", href: "/library?tab=circulation&sub=reservations", icon: Clock },
+          { title: "Overdue", href: "/library?tab=circulation&sub=overdue", icon: AlertCircle },
+        ],
+        secondaryTitle: "Acquisition, Fines & Reports",
+        secondaryItems: [
+          { title: "Book Requests", href: "/library?tab=acquisition&sub=requests", icon: ShoppingBag },
+          { title: "Purchases", href: "/library?tab=acquisition&sub=purchases", icon: Receipt },
+          { title: "Suppliers", href: "/library?tab=acquisition&sub=suppliers", icon: Building2 },
+          { title: "Pending Fines", href: "/library?tab=fines&sub=pending", icon: AlertTriangle },
+          { title: "Payments", href: "/library?tab=fines&sub=payments", icon: DollarSign },
+          { title: "Waivers", href: "/library?tab=fines&sub=waivers", icon: Percent },
+          { title: "Library Reports", href: "/library?tab=reports", icon: BarChart2 },
         ],
       },
     ],
@@ -638,18 +680,6 @@ export const erpModules: NavItem[] = [
     href: "/master-setup",
     icon: Sliders,
     categories: [
-      {
-        title: "Academic Setup",
-        items: [
-          { title: "Academic Years", href: "/master-setup/batches", icon: Calendar },
-          { title: "Departments", href: "/master-setup/departments", icon: Building2 },
-          { title: "Programs", href: "/master-setup/programs", icon: BookOpen },
-          { title: "Classes / Grades", href: "/master-setup/classes", icon: GraduationCap },
-          { title: "Academic Levels", href: "/master-setup/academic-levels", icon: Layers },
-          { title: "Sections", href: "/master-setup/sections", icon: Users },
-          { title: "Subjects", href: "/master-setup/subjects", icon: FileText },
-        ],
-      },
       {
         title: "HR Setup",
         items: [

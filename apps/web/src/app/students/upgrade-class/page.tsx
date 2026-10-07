@@ -209,7 +209,7 @@ export default function UpgradeClassPage() {
           </Link>
           <div>
             <h1 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
-              Upgrade Class/Semester
+              Student Promotion
             </h1>
             <p className="text-xs text-[var(--neutral-500)]">
               Promote students to next class or semester

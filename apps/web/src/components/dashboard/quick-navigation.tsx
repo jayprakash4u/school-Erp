@@ -263,7 +263,7 @@ export function QuickNavigation() {
                 </h3>
               </div>
               <Link
-                href="/academics"
+                href="/master-setup/classes"
                 className="text-[11px] font-semibold text-[var(--brand-primary)] hover:underline flex items-center gap-0.5"
               >
                 All <ChevronRight className="h-3 w-3" />
@@ -271,11 +271,11 @@ export function QuickNavigation() {
             </div>
 
             <div className="p-3 divide-y divide-[var(--border-light)] flex-1 text-xs">
-              <Link href="/academics/classes" className="flex items-center justify-between py-2 px-1 text-[var(--text-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] rounded transition-colors">
+              <Link href="/master-setup/classes" className="flex items-center justify-between py-2 px-1 text-[var(--text-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] rounded transition-colors">
                 <span>Classes & Sections</span>
                 <ArrowRight className="h-3 w-3 text-[var(--neutral-400)]" />
               </Link>
-              <Link href="/academics/subjects" className="flex items-center justify-between py-2 px-1 text-[var(--text-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] rounded transition-colors">
+              <Link href="/master-setup/subjects" className="flex items-center justify-between py-2 px-1 text-[var(--text-primary)] hover:text-[var(--brand-primary)] hover:bg-[var(--neutral-50)] rounded transition-colors">
                 <span>Subjects & Syllabus</span>
                 <ArrowRight className="h-3 w-3 text-[var(--neutral-400)]" />
               </Link>

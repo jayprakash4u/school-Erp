@@ -58,7 +58,7 @@ const QUICK_MENU_COLUMNS: QuickAccessColumn[] = [
     items: [
       { title: "Student Registration", href: "/students/admission", icon: UserPlus },
       { title: "Our Students", href: "/students", icon: Users },
-      { title: "Upgrade Class", href: "/students/upgrade-class", icon: ArrowRight },
+      { title: "Student Promotion", href: "/students/upgrade-class", icon: ArrowRight },
       { title: "Change Section", href: "/students/change-section", icon: ArrowLeftRight },
       { title: "Student Attendance", href: "/attendance", icon: CalendarCheck },
       { title: "Transfer Certificate", href: "/documents", icon: FileCheck },
@@ -80,25 +80,23 @@ const QUICK_MENU_COLUMNS: QuickAccessColumn[] = [
   {
     title: "Academics & Exams",
     items: [
-      { title: "Classes & Sections", href: "/academics/classes", icon: Building },
-      { title: "Subjects & Syllabus", href: "/academics/subjects", icon: BookOpen },
+      { title: "Classes & Sections", href: "/master-setup/classes", icon: Building },
+      { title: "Subjects & Syllabus", href: "/master-setup/subjects", icon: BookOpen },
+      { title: "Academic Years", href: "/master-setup/batches", icon: Calendar },
       { title: "Class Timetable", href: "/academics/timetable", icon: Clock },
       { title: "Exam Schedule", href: "/examinations/schedule", icon: Calendar },
       { title: "Marks Entry", href: "/examinations/marks", icon: FileSpreadsheet },
       { title: "Report Cards", href: "/examinations/report-cards", icon: Award },
-      { title: "Library Issue / Return", href: "/library/issue-return", icon: BookMarked },
     ],
   },
   {
     title: "Master Setup & HR",
     items: [
       { title: "General Setup", href: "/master-setup/general", icon: Settings },
-      { title: "Class Setup", href: "/master-setup/classes", icon: Building },
       { title: "Department Setup", href: "/master-setup/departments", icon: Building2 },
       { title: "Designation Setup", href: "/master-setup/designations", icon: Award },
       { title: "Subject Mapping", href: "/master-setup/subject-mapping", icon: Layers },
       { title: "Document Numbering", href: "/master-setup/document-numbering", icon: Tag },
-      { title: "Batches", href: "/master-setup/batches", icon: Calendar },
       { title: "Location", href: "/master-setup/locations", icon: MapPin },
       { title: "Staff Payroll", href: "/staff/payroll", icon: DollarSign },
     ],

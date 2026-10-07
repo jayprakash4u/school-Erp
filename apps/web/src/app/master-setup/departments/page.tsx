@@ -255,7 +255,7 @@ export default function DepartmentSetupPage() {
       <ErpHeader />
 
       {/* 2. Global ERP 2-Row Top Navigation Menu */}
-      <ErpTopNav activeModuleId="master-setup" />
+      <ErpTopNav activeModuleId="academics" />
 
       {/* 3. Main Workspace */}
       <main className="flex-1 max-w-[1200px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">

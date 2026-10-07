@@ -375,7 +375,7 @@ export default function SubjectSetupPage() {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-secondary)] text-[var(--text-primary)] select-none">
       <ErpHeader />
-      <ErpTopNav activeModuleId="master-setup" />
+      <ErpTopNav activeModuleId="academics" />
 
       <main className="flex-1 max-w-[1400px] w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-5">
         {/* Breadcrumb */}
