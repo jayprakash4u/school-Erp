@@ -58,6 +58,7 @@ import {
   Receipt,
   UserPlus,
   Percent,
+  List,
   BarChart2,
 } from "lucide-react";
 import { ErpHeader } from "@/components/layout/erp-header";
