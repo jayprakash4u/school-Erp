@@ -310,3 +310,34 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ERP Navigation Layout Adaptations (Top Bar vs Sidebar) */
+body[data-nav-layout="sidebar"] main {
+  margin-left: 312px !important;
+  margin-right: auto !important;
+  width: calc(100% - 312px) !important;
+  transition: margin-left 0.2s cubic-bezier(0.16, 1, 0.3, 1), width 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body[data-nav-layout="sidebar"][data-submenu-collapsed="true"] main {
+  margin-left: 72px !important;
+  margin-right: auto !important;
+  width: calc(100% - 72px) !important;
+}
+
+@media (max-width: 1023px) {
+  body[data-nav-layout="sidebar"] main {
+    margin-left: 72px !important;
+    margin-right: auto !important;
+    width: calc(100% - 72px) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  body[data-nav-layout="sidebar"] main {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    width: 100% !important;
+  }
+}
+

@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { erpModules } from "@/config/navigation";
 import { NavItem } from "@/types/navigation";
 import { ErpMegaMenu } from "./erp-mega-menu";
+import { ErpSidebar } from "./erp-sidebar";
+import { useUIStore } from "@/stores/ui-store";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +18,21 @@ interface ErpTopNavProps {
 
 export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps) {
   const pathname = usePathname();
+  const navLayout = useUIStore((state) => state.navLayout);
+  const isSubmenuCollapsed = useUIStore((state) => state.isSubmenuCollapsed);
   const [openModuleId, setOpenModuleId] = React.useState<string | null>(null);
   const [isExpandedRows, setIsExpandedRows] = React.useState<boolean>(false);
+
+  // Synchronize document.body dataset attributes for responsive layout shifts
+  React.useEffect(() => {
+    if (typeof document !== "undefined") {
+      document.body.setAttribute("data-nav-layout", navLayout);
+      document.body.setAttribute(
+        "data-submenu-collapsed",
+        isSubmenuCollapsed ? "true" : "false"
+      );
+    }
+  }, [navLayout, isSubmenuCollapsed]);
   const [activeItemMeta, setActiveItemMeta] = React.useState<{
     row: number;
     index: number;
@@ -71,13 +86,20 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
       }
     };
 
+    const handleResize = () => {
+      setOpenModuleId(null);
+      setActiveItemMeta(null);
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("touchstart", handleClickOutside, { passive: true });
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("touchstart", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
@@ -127,7 +149,9 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
   // Calculate dropdown modal alignment
   const getDropdownStyle = () => {
     const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-    const containerWidth = innerContainerRef.current?.offsetWidth || 1200;
+    const containerWidth =
+      innerContainerRef.current?.offsetWidth ||
+      (typeof window !== "undefined" ? window.innerWidth : 1200);
     const colCount = activeModule?.categories?.length || 1;
 
     if (isMobile) {
@@ -197,7 +221,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
       <div
         key={module.id}
         className={cn(
-          "flex-1 min-w-0 h-10 flex items-center justify-center transition-colors relative",
+          "flex-1 min-w-0 h-10 lg:h-10.5 flex items-center justify-center transition-colors relative",
           !isLastInRow && "border-r border-[var(--border-default)]"
         )}
       >
@@ -215,24 +239,24 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
               )
             }
             className={cn(
-              "w-full h-full px-1.5 lg:px-2.5 flex items-center justify-center gap-1 lg:gap-1.5 text-xs font-semibold transition-all duration-150 select-none cursor-pointer group relative whitespace-nowrap",
+              "w-full h-full px-1 sm:px-1.5 md:px-2 lg:px-2.5 xl:px-3 flex items-center justify-center gap-1 lg:gap-1.5 text-xs lg:text-[12px] xl:text-[13px] font-semibold transition-all duration-150 select-none cursor-pointer group relative whitespace-nowrap",
               isOpen || isCurrentActive
-                ? "text-[var(--brand-primary)] font-bold bg-[var(--red-50)]/60"
+                ? "text-[var(--brand-primary)] font-bold bg-[var(--red-50)]/70 shadow-2xs"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--neutral-50)]"
             )}
           >
-            <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors" />
+            <Icon className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0 text-[var(--brand-primary)] transition-transform duration-200 group-hover:scale-105" />
             <span className="tracking-tight font-medium whitespace-nowrap truncate">
               {displayTitle}
             </span>
             <ChevronDown
               className={cn(
-                "h-3 w-3 shrink-0 text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)] transition-transform duration-200 ml-0.5",
+                "h-3 w-3 lg:h-3.5 lg:w-3.5 shrink-0 text-[var(--neutral-400)] group-hover:text-[var(--brand-primary)] transition-transform duration-200 ml-0.5",
                 isOpen && "rotate-180 text-[var(--brand-primary)]"
               )}
             />
             {(isOpen || isCurrentActive) && (
-              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--brand-primary)]" />
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[var(--brand-primary)] rounded-t-[1px]" />
             )}
           </button>
         ) : (
@@ -244,18 +268,18 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
               setActiveItemMeta(null);
             }}
             className={cn(
-              "w-full h-full px-1.5 lg:px-2.5 flex items-center justify-center gap-1 lg:gap-1.5 text-xs font-semibold transition-all duration-150 select-none group relative whitespace-nowrap",
+              "w-full h-full px-1 sm:px-1.5 md:px-2 lg:px-2.5 xl:px-3 flex items-center justify-center gap-1 lg:gap-1.5 text-xs lg:text-[12px] xl:text-[13px] font-semibold transition-all duration-150 select-none group relative whitespace-nowrap",
               isCurrentActive
-                ? "text-[var(--brand-primary)] font-bold bg-[var(--red-50)]/60"
+                ? "text-[var(--brand-primary)] font-bold bg-[var(--red-50)]/70 shadow-2xs"
                 : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--neutral-50)]"
             )}
           >
-            <Icon className="h-3.5 w-3.5 shrink-0 text-[var(--brand-primary)] transition-colors" />
+            <Icon className="h-3.5 w-3.5 lg:h-4 lg:w-4 shrink-0 text-[var(--brand-primary)] transition-transform duration-200 group-hover:scale-105" />
             <span className="tracking-tight font-medium whitespace-nowrap truncate">
               {displayTitle}
             </span>
             {isCurrentActive && (
-              <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--brand-primary)]" />
+              <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[var(--brand-primary)] rounded-t-[1px]" />
             )}
           </Link>
         )}
@@ -349,6 +373,11 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     );
   };
 
+  // If user selected sidebar navigation mode, render the 2-tier enterprise sidebar
+  if (navLayout === "sidebar") {
+    return <ErpSidebar activeModuleId={activeModuleId} />;
+  }
+
   return (
     <nav
       ref={navRef}
@@ -357,7 +386,7 @@ export function ErpTopNav({ onSelectSubOption, activeModuleId }: ErpTopNavProps)
     >
       <div
         ref={innerContainerRef}
-        className="max-w-[1600px] mx-auto relative overflow-visible"
+        className="w-full relative overflow-visible"
       >
         {/* =================================================================== */}
         {/* DESKTOP VIEW (MD+): 2 CONTINUOUS ROWS OF 10 ITEMS EACH              */}

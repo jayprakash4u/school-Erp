@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { GraduationCap, Search, ChevronDown, LayoutGrid } from "lucide-react";
+import { GraduationCap, Search, ChevronDown, LayoutGrid, PanelTop, PanelLeft } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { useUIStore } from "@/stores/ui-store";
 import { QuickAccessModal } from "./quick-access-modal";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,8 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
   const [isQuickMenuOpen, setIsQuickMenuOpen] = React.useState(false);
   const user = useAuthStore((state) => state.user);
   const activeAcademicYear = useAuthStore((state) => state.activeAcademicYear);
+  const navLayout = useUIStore((state) => state.navLayout);
+  const setNavLayout = useUIStore((state) => state.setNavLayout);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
@@ -66,8 +69,42 @@ export function ErpHeader({ onSearchChange }: ErpHeaderProps) {
             </div>
           </div>
 
-          {/* Right: Quick Menu, Fiscal Year & User Profile */}
-          <div className="flex items-center gap-3 shrink-0">
+          {/* Right: Layout Switcher, Quick Menu, Fiscal Year & User Profile */}
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+            {/* Navigation Layout Switcher (Top Bar vs Sidebar) */}
+            <div className="flex items-center p-0.5 rounded-[6px] bg-[var(--neutral-900)] border border-[var(--neutral-700)] shadow-xs">
+              <button
+                type="button"
+                onClick={() => setNavLayout("top")}
+                title="Switch to Top Navigation Bar"
+                aria-label="Switch to Top Navigation Bar"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-semibold transition-all cursor-pointer",
+                  navLayout === "top"
+                    ? "bg-[var(--brand-primary)] text-white shadow-2xs font-bold"
+                    : "text-[var(--neutral-400)] hover:text-white hover:bg-[var(--neutral-800)]"
+                )}
+              >
+                <PanelTop className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Top Bar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setNavLayout("sidebar")}
+                title="Switch to Sidebar Navigation"
+                aria-label="Switch to Sidebar Navigation"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] text-xs font-semibold transition-all cursor-pointer",
+                  navLayout === "sidebar"
+                    ? "bg-[var(--brand-primary)] text-white shadow-2xs font-bold"
+                    : "text-[var(--neutral-400)] hover:text-white hover:bg-[var(--neutral-800)]"
+                )}
+              >
+                <PanelLeft className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Sidebar</span>
+              </button>
+            </div>
+
             {/* Quick Menu Button with 4-Column Popover Modal */}
             <div className="relative">
               <button
